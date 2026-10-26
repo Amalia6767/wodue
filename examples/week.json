@@ -1,0 +1,145 @@
+{
+  "version": 2,
+  "tasks": [
+    {
+      "id": "7d526f51-42d0-47dd-a389-12019703dc3d",
+      "title": "提交交互原型",
+      "day": "2026-10-26",
+      "completed": false,
+      "createdAt": 0,
+      "kind": "提交 / 截止",
+      "categoryID": "assignment",
+      "startMinute": 1087,
+      "importance": 3,
+      "estimatedMinutes": 120
+    },
+    {
+      "id": "469b02ed-008d-4c38-ac7a-d2abdff872b2",
+      "title": "Presentation 幻灯片定稿",
+      "day": "2026-10-26",
+      "completed": false,
+      "createdAt": 0,
+      "kind": "提交 / 截止",
+      "categoryID": "presentation",
+      "startMinute": 1365,
+      "importance": 2
+    },
+    {
+      "id": "00e485d1-4be2-49d3-b2b1-b8bbab0984a0",
+      "title": "小组研究报告",
+      "day": "2026-10-28",
+      "completed": false,
+      "createdAt": 0,
+      "kind": "提交 / 截止",
+      "categoryID": "assignment",
+      "startMinute": 1065,
+      "estimatedMinutes": 180
+    },
+    {
+      "id": "7fd735ef-30e6-45da-a686-85058af2947d",
+      "title": "报名周末展览",
+      "day": "2026-10-26",
+      "completed": false,
+      "createdAt": 0,
+      "kind": "提交 / 截止",
+      "categoryID": "exhibition"
+    },
+    {
+      "id": "5fdab457-8008-4fe4-afe5-ae1f814cc38d",
+      "title": "线上设计 Workshop",
+      "day": "2026-10-26",
+      "completed": false,
+      "createdAt": 0,
+      "kind": "活动 / 行程",
+      "categoryID": "workshop",
+      "startMinute": 600,
+      "endMinute": 660,
+      "link": "https://example.org/workshop",
+      "notes": "虚构演示活动；链接不会连接真实会议。"
+    },
+    {
+      "id": "4b698205-69bc-4c6e-bf2a-71574fca4ee0",
+      "title": "三日旅行",
+      "day": "2026-11-02",
+      "completed": false,
+      "createdAt": 0,
+      "kind": "活动 / 行程",
+      "categoryID": "travel",
+      "endDay": "2026-11-04"
+    }
+  ],
+  "timeBlocks": [
+    {
+      "id": "fd083608-60a8-4819-9c24-bf4231080a89",
+      "title": "起床、早餐与走动",
+      "day": "2026-10-26",
+      "startMinute": 600,
+      "endMinute": 630,
+      "categoryID": "home",
+      "taskID": null,
+      "rest": false,
+      "completed": false,
+      "createdAt": 0
+    },
+    {
+      "id": "d78ec2d3-eb53-4cbf-b84e-ba5aba9393eb",
+      "title": "写项目草稿",
+      "day": "2026-10-26",
+      "startMinute": 660,
+      "endMinute": 720,
+      "categoryID": "assignment",
+      "taskID": "00e485d1-4be2-49d3-b2b1-b8bbab0984a0",
+      "rest": false,
+      "completed": false,
+      "createdAt": 0
+    },
+    {
+      "id": "0a482420-36a8-408f-bb66-8ed80fbb3dc0",
+      "title": "午饭与休息",
+      "day": "2026-10-26",
+      "startMinute": 720,
+      "endMinute": 780,
+      "categoryID": "rest",
+      "taskID": null,
+      "rest": true,
+      "completed": false,
+      "createdAt": 0
+    },
+    {
+      "id": "126c949b-089a-4d53-962d-7737026d636c",
+      "title": "制作交互原型",
+      "day": "2026-10-26",
+      "startMinute": 780,
+      "endMinute": 900,
+      "categoryID": "assignment",
+      "taskID": "7d526f51-42d0-47dd-a389-12019703dc3d",
+      "rest": false,
+      "completed": false,
+      "createdAt": 0
+    },
+    {
+      "id": "89b35495-0a4f-4075-9cfd-950892385872",
+      "title": "站起来，喝点水",
+      "day": "2026-10-26",
+      "startMinute": 900,
+      "endMinute": 915,
+      "categoryID": "rest",
+      "taskID": null,
+      "rest": true,
+      "completed": false,
+      "createdAt": 0
+    },
+    {
+      "id": "8763f060-3e10-4646-83b4-443ef97e3ef6",
+      "title": "整理演讲素材",
+      "day": "2026-10-26",
+      "startMinute": 915,
+      "endMinute": 1020,
+      "categoryID": "presentation",
+      "taskID": null,
+      "rest": false,
+      "completed": false,
+      "createdAt": 0
+    }
+  ]
+}

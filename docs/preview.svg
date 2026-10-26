@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="660" viewBox="0 0 1200 660" role="img" aria-labelledby="title description">
+  <title id="title">我Due！· WoDue</title>
+  <desc id="description">Concept illustration with fictional tasks: a quiet desktop note, a clearer hover state and an urgent deadline reminder.</desc>
+  <defs>
+    <linearGradient id="desk" x2="1" y2="1"><stop stop-color="#e8e3ec"/><stop offset=".55" stop-color="#e0e9e4"/><stop offset="1" stop-color="#f4e7da"/></linearGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#4a3b35" flood-opacity=".10"/></filter>
+  </defs>
+  <rect width="1200" height="660" rx="28" fill="#faf8f4"/>
+  <g font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC',sans-serif">
+    <text x="52" y="78" font-size="36" font-weight="700" fill="#393832">我Due！<tspan font-size="20" fill="#b35e70">WoDue</tspan></text>
+    <text x="52" y="112" font-size="17" fill="#858178">DDL 别丢，生活照过。</text>
+    <text x="1148" y="78" text-anchor="end" font-size="12" fill="#858178">ILLUSTRATION · FICTIONAL DATA</text>
+    <rect x="30" y="146" width="1140" height="440" rx="22" fill="url(#desk)"/>
+    <text x="80" y="191" font-size="12" letter-spacing="2" fill="#777d79">平时 · 安静在场</text>
+    <text x="82" y="246" font-size="19" font-weight="650" fill="#424b48">今天</text>
+    <text x="82" y="273" font-size="12" fill="#67726b">给重要的事，留一点位置。</text>
+    <g fill="none" stroke="#7e8c6d" stroke-width="1.7"><circle cx="92" cy="318" r="9"/><path d="m87 318 4 4 7-8"/><circle cx="92" cy="361" r="9"/><circle cx="92" cy="404" r="9"/></g>
+    <text x="115" y="324" font-size="16" fill="#7d8780" text-decoration="line-through">整理阅读笔记</text>
+    <text x="115" y="367" font-size="16" fill="#424b48">写项目草稿</text>
+    <text x="115" y="410" font-size="16" fill="#424b48">走动一下，喝杯水</text>
+    <text x="456" y="191" font-size="12" letter-spacing="2" fill="#777d79">关注时 · 清楚可操作</text>
+    <g filter="url(#shadow)">
+      <rect x="444" y="213" width="302" height="324" rx="18" fill="#fbf9f5"/>
+      <text x="468" y="250" font-size="18" font-weight="650" fill="#393832">今天</text>
+      <line x1="468" y1="271" x2="722" y2="271" stroke="#e8e3da"/>
+      <text x="468" y="303" font-size="12" fill="#858178">11:00 – 12:00</text>
+      <text x="468" y="329" font-size="16" fill="#393832">写项目草稿</text>
+      <text x="468" y="365" font-size="12" fill="#858178">12:00 – 13:00</text>
+      <text x="468" y="391" font-size="16" fill="#393832">午饭与休息</text>
+      <rect x="466" y="428" width="258" height="43" rx="8" fill="#f3e2e3" fill-opacity=".6"/>
+      <text x="482" y="455" font-size="14" fill="#858178">＋ 添加今天的事项…</text>
+      <text x="468" y="508" font-size="11" fill="#858178">可以划掉，也可以再安排一段。</text>
+    </g>
+    <g filter="url(#shadow)">
+      <rect x="782" y="213" width="340" height="324" rx="18" fill="#faf8f4" stroke="#dbb0a8"/>
+      <path d="M800 213h304a18 18 0 0 1 18 18v70H782v-70a18 18 0 0 1 18-18" fill="#f9e9e5"/>
+      <circle cx="816" cy="254" r="13" fill="#ad3e39"/>
+      <text x="816" y="260" text-anchor="middle" font-size="18" font-weight="700" fill="white">!</text>
+      <text x="841" y="260" font-size="19" font-weight="650" fill="#393832">截止时间近了。</text>
+      <text x="806" y="336" font-size="13" font-weight="650" fill="#ad3e39">半小时内截止</text>
+      <text x="806" y="370" font-size="18" font-weight="650" fill="#393832">提交交互原型</text>
+      <text x="806" y="403" font-size="15" fill="#ad3e39">还剩 22 分钟</text>
+      <rect x="804" y="453" width="146" height="37" rx="7" fill="#eee9e3"/>
+      <text x="877" y="477" text-anchor="middle" font-size="13" fill="#393832">30 分钟后提醒</text>
+      <rect x="1003" y="453" width="95" height="37" rx="7" fill="#ad3e39"/>
+      <text x="1050" y="477" text-anchor="middle" font-size="13" fill="white">知道了</text>
+    </g>
+    <text x="600" y="626" text-anchor="middle" font-size="15" fill="#858178">收集节点　→　安排时间　→　专注与休息　→　到点提醒</text>
+  </g>
+</svg>
