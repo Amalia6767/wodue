@@ -3,6 +3,8 @@ import Foundation
 @main
 struct ModelTests {
     @MainActor static func main() throws {
+        // Process-local fixture timezone; never changes the machine's settings.
+        NSTimeZone.default = TimeZone(secondsFromGMT: 8 * 3600)!
         let root = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
             .appendingPathComponent("run-" + UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

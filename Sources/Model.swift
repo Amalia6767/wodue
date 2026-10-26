@@ -285,7 +285,12 @@ final class TodoStore: ObservableObject {
                 let oldTime = old.startMinute.map { String(format: "%02d:%02d", $0 / 60, $0 % 60) } ?? "未指定时间"
                 let history = "此前截止：\(old.day) \(oldTime)"
                 if updated.canvasSource == old.canvasSource && updated.day == old.day && updated.startMinute == old.startMinute { continue }
-                updated.notes = String(((updated.notes ?? "") + "\n\n" + history + "\n" + (old.notes ?? "")).prefix(100_000))
+                var revisedNotes = updated.notes ?? ""
+                revisedNotes.append("\n\n")
+                revisedNotes.append(history)
+                revisedNotes.append("\n")
+                revisedNotes.append(old.notes ?? "")
+                updated.notes = String(revisedNotes.prefix(100_000))
                 next[i] = updated
             } else { next.append(updated) }
         }
