@@ -13,6 +13,7 @@ outputs/
 tasks.json
 focus.json
 deadline-reminders.json
+event-reminders.json
 *-draft.txt
 *备份*.json
 每日清单数据/

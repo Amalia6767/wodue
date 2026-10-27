@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0 — 2026-10-27
+
+- Timed meetings and activities now remind 15 minutes before their start and again at the start.
+- Meeting links are available on timeline cards, desktop reminders and notification actions.
+- Meeting snoozes stop at the start time; completion and rescheduling remove stale notifications.
+- Deadline, meeting, time-block and focus notifications share bounded scheduling budgets.
+
 ## 0.1.0 — Public preview
 
 - Quiet hover-revealed desktop note with visible completed tasks.

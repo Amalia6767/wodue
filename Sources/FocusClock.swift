@@ -220,7 +220,7 @@ final class FocusClock: ObservableObject {
                 guard self.notificationsEnabled else { return }
                 let now = Date()
                 let blocks = self.plannedBlocks.filter { !$0.completed && (ClockText.date($0.day, $0.endMinute) ?? .distantPast) > now }
-                    .sorted { ($0.day, $0.startMinute) < ($1.day, $1.startMinute) }.prefix(15)
+                    .sorted { ($0.day, $0.startMinute) < ($1.day, $1.startMinute) }.prefix(ReminderBudget.blocks)
                 for block in blocks {
                     for isStart in [true, false] {
                         guard let date = ClockText.date(block.day, isStart ? block.startMinute : block.endMinute), date > now else { continue }

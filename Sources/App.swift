@@ -31,7 +31,10 @@ struct DaylistApp: App {
     @StateObject private var focus = FocusClock.shared
     @ViewState private var editor: EditorItem? = nil
 
-    init() { UNUserNotificationCenter.current().delegate = ReminderNotificationDelegate.shared }
+    init() {
+        UNUserNotificationCenter.current().delegate = ReminderNotificationDelegate.shared
+        ReminderNotificationDelegate.registerCategories()
+    }
 
     var body: some Scene {
         WindowGroup("我Due！", id: "main") {
@@ -58,6 +61,7 @@ struct DaylistApp: App {
             CommandMenu("规划") {
                 Button("自定义分类与颜色…") { ToolsWindowController.shared.showCategories(store: store) }
                 Button("查看三天内的截止提醒") { DeadlineReminder.shared.show() }
+                Button("会议与活动提醒…") { EventReminder.shared.show() }
             }
             CommandMenu("桌面便签") {
                 Button("显示 / 隐藏便签") { DesktopNoteController.shared.toggle() }
@@ -145,6 +149,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 0) {
                 topbar
                 DeadlineBanner(store: store, onEdit: { editor = EditorItem(task: $0, day: $0.day) })
+                EventBanner()
                 if scope == .today {
                     DailyPlannerView(store: store, day: selectedDay ?? Day.today, onDay: { selectedDay = $0; calendarMonth = Day.date($0)! }, onEdit: { editor = EditorItem(task: $0, day: $0.day) }, onAddTask: { editor = EditorItem(day: selectedDay ?? Day.today) })
                 } else if scope == .horizon && selectedDay == nil {
@@ -202,6 +207,13 @@ struct ContentView: View {
             }
             deadlines.presentationChanged = { requested in DeadlinePanelController.shared.update(reminder: deadlines, store: store, requested: requested) }
             deadlines.configure(store: store)
+            let events = EventReminder.shared
+            events.openTask = { task in
+                openWindow(id: "main"); NSApp.activate(ignoringOtherApps: true)
+                editor = EditorItem(task: task, day: task.day)
+            }
+            events.presentationChanged = { requested in EventPanelController.shared.update(reminder: events, requested: requested) }
+            events.configure(store: store)
         }
         .sheet(item: $editor) { item in
             TaskEditor(store: store, item: item) { saved in

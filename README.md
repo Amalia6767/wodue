@@ -1,16 +1,16 @@
 # 我Due！ · WoDue
 
-**DDL 别丢，生活照过。** · Public preview 0.1.0
+**DDL 别丢，生活照过。** · Public preview 0.2.0
 
 A quiet macOS desktop planner that gets louder as deadlines approach.
 
 ![WoDue concept illustration with fictional tasks](docs/preview.svg)
 
-[中文使用说明](docs/使用说明.md) · [Privacy](docs/PRIVACY.md) · [MIT License](LICENSE)
+[下载 macOS 版（Apple Silicon）](https://github.com/Amalia6767/wodue/releases/tag/v0.2.0) · [中文使用说明](docs/使用说明.md) · [Privacy](docs/PRIVACY.md) · [MIT License](LICENSE)
 
 我Due！为课程作业、邮件通知、Presentation 和个人活动交织的生活而做：把未来节点落实为今天的时间安排，再用专注与休息一段段推进。
 
-平时，桌面便签几乎没有底色；鼠标移入，底板和操作浮现。临近截止时，提醒逐级变明显。
+平时，桌面便签几乎没有底色；鼠标移入，底板和操作浮现。临近截止时，提醒逐级变明显；会议和活动提前 15 分钟提醒，卡片里可直接打开已保存的链接。
 
 ## What it does
 
@@ -21,6 +21,7 @@ A quiet macOS desktop planner that gets louder as deadlines approach.
 | Long-term plans | Submission deadlines, presentations, workshops, exhibitions and multi-day travel; editable categories and colors. |
 | Deadline radar | Highlights the next 72 hours, then escalates on the day, in the last two hours, in the last 30 minutes and when overdue. Date-only items stay date-only. |
 | Desktop reminders | Grouped cards, acknowledgment, 30-minute snooze and completion. A snooze never hides an exact deadline past its cutoff. |
+| Meeting alerts | Timed activities warn 15 minutes before their start and again at the start. Cards and notification actions open saved meeting links; five-minute snoozes stop at the start time. |
 | Focus and breaks | 25/5, 50/10 or custom rounds; pause/resume, a menu-bar timer and a hard stop at the end of a planned block. |
 | Mac Calendar | Read-only mirroring of selected calendars through EventKit. Local completion never changes source events. |
 | Paste to import | Local parsing of email/event text and Canvas assignments/notices, with an editable preview before saving. |
@@ -79,7 +80,7 @@ Normal data lives in:
 ~/Library/Application Support/io.github.amalia6767.wodue/
 ```
 
-`tasks.json` stores plans/categories/blocks; `focus.json` stores focus state; `deadline-reminders.json` stores reminder acknowledgments and snoozes. Paste drafts are also local. Back up this directory to preserve everything. JSON plan exports contain tasks, categories and blocks, but not the separate focus/reminder files.
+`tasks.json` stores plans/categories/blocks; `focus.json` stores focus state; `deadline-reminders.json` stores deadline acknowledgments and snoozes; `event-reminders.json` stores meeting acknowledgments and snoozes. Paste drafts are also local. Back up this directory to preserve everything. JSON plan exports contain tasks, categories and blocks, but not the separate focus/reminder files.
 
 This public source tree contains fictional examples only. Personal calendars, task exports, imported text, meeting links and local build artifacts are excluded. See [PRIVACY.md](docs/PRIVACY.md) before sharing logs or screenshots.
 

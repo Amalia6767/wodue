@@ -211,6 +211,7 @@ private struct DesktopNoteView: View {
                     Button("Canvas 作业与通知…") { ToolsWindowController.shared.showCanvasImporter(store: store) }
                     Button("日历同步设置…") { ToolsWindowController.shared.showCalendars(store: store) }
                     Button("查看三天内的截止提醒") { deadlines.show() }
+                    Button("会议与活动提醒…") { EventReminder.shared.show() }
                     Divider()
                     Button("外观与文字颜色…") { showAppearance = true }
                     Divider()
@@ -244,6 +245,8 @@ private struct DesktopNoteView: View {
                         .background(urgent.stage.color.opacity(engaged ? 0.09 : 0))
                 }.buttonStyle(.plain).help("查看所有临近截止事项")
             }
+
+            EventNoteStrip(lightText: controller.lightText)
 
             if let session = focusClock.session {
                 HStack(spacing: 8) {

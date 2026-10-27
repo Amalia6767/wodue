@@ -5,6 +5,16 @@ import AppKit
 
 final class ReminderNotificationDelegate: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
     static let shared = ReminderNotificationDelegate()
+    static func registerCategories() {
+        let snooze = UNNotificationAction(identifier: "daylist.event.snooze", title: "5 分钟后提醒")
+        let join = UNNotificationAction(identifier: "daylist.event.join", title: "打开活动链接", options: [.foreground])
+        let deadline = UNNotificationCategory(identifier: "daylist.deadline", actions: [
+            UNNotificationAction(identifier: "daylist.snooze", title: "30 分钟后提醒"),
+            UNNotificationAction(identifier: "daylist.complete", title: "标为已完成")], intentIdentifiers: [])
+        UNUserNotificationCenter.current().setNotificationCategories([deadline,
+            UNNotificationCategory(identifier: "daylist.event", actions: [snooze], intentIdentifiers: []),
+            UNNotificationCategory(identifier: "daylist.event.link", actions: [join, snooze], intentIdentifiers: [])])
+    }
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         // The app's deadline card covers foreground alerts; other timers keep their banners.
@@ -14,6 +24,14 @@ final class ReminderNotificationDelegate: NSObject, UNUserNotificationCenterDele
                 DeadlineReminder.shared.refresh()
                 completionHandler(NSApp.isActive && DeadlineReminder.shared.popupsEnabled ? [] : [.banner, .list, .sound])
             }
+        } else if notification.request.identifier.hasPrefix("daylist.event.") {
+            Task { @MainActor in
+                EventReminder.shared.refresh()
+                let shown = EventReminder.shared.presented.contains {
+                    $0.id.uuidString == notification.request.content.userInfo["taskID"] as? String
+                }
+                completionHandler(NSApp.isActive && shown ? [] : [.banner, .list, .sound])
+            }
         } else { completionHandler([.banner, .list, .sound]) }
     }
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
@@ -21,9 +39,13 @@ final class ReminderNotificationDelegate: NSObject, UNUserNotificationCenterDele
         let info = response.notification.request.content.userInfo
         if let id = info["taskID"] as? String, let revision = info["revision"] as? String {
             let action = response.actionIdentifier
-            Task { @MainActor in DeadlineReminder.shared.handleResponse(id: id, revision: revision, action: action) }
-        }
-        completionHandler()
+            let event = response.notification.request.identifier.hasPrefix("daylist.event.")
+            Task { @MainActor in
+                if event { EventReminder.shared.handleResponse(id: id, revision: revision, action: action) }
+                else { DeadlineReminder.shared.handleResponse(id: id, revision: revision, action: action) }
+                completionHandler()
+            }
+        } else { completionHandler() }
     }
 }
 
@@ -68,9 +90,7 @@ final class DeadlineReminder: ObservableObject {
         if useSystem {
             let center = UNUserNotificationCenter.current()
             center.delegate = ReminderNotificationDelegate.shared
-            let actions = [UNNotificationAction(identifier: "daylist.snooze", title: "30 分钟后提醒"),
-                           UNNotificationAction(identifier: "daylist.complete", title: "标为已完成")]
-            center.setNotificationCategories([UNNotificationCategory(identifier: "daylist.deadline", actions: actions, intentIdentifiers: [])])
+            ReminderNotificationDelegate.registerCategories()
             FocusClock.shared.$notificationsEnabled.removeDuplicates().sink { [weak self] enabled in
                 self?.notificationsEnabled = enabled; self?.scheduleNotifications()
             }.store(in: &subscriptions)
@@ -157,7 +177,7 @@ final class DeadlineReminder: ObservableObject {
         }
         var keys = Set<String>()
         notices = notices.sorted { $0.date < $1.date }.filter { keys.insert($0.identifier).inserted }
-        let planned = Array(notices.prefix(32))
+        let planned = Array(notices.prefix(ReminderBudget.deadlines))
         let enabled = notificationsEnabled
         let validRevisions = Set(tasks.filter { !$0.completed && $0.resolvedKind == .deadline }.map {
             DeadlineItem(task: $0, stage: .soon, due: nil).revision

@@ -198,6 +198,7 @@ struct DailyPlannerView: View {
                         Spacer()
                     }
                 }
+                if let task = item.task { EventReminderStatus(task: task) }
                 if let block = item.block {
                     if let linked = store.tasks.first(where: { $0.id == block.taskID }) {
                         Text("准备：\(linked.title) · \(linked.dateLabel)").font(.system(size: 9)).foregroundColor(Palette.secondary).lineLimit(2)

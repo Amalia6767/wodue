@@ -18,6 +18,8 @@ Normal documents live under `~/Library/Application Support/io.github.amalia6767.
 
 macOS manages notification authorization and delivery. Notification content includes task titles and dates, so it may be visible in Notification Center or on the lock screen according to your macOS settings.
 
+Meeting acknowledgment and snooze records are saved locally in `event-reminders.json` and excluded from source control. Meeting notification actions resolve the current link from the local task; they do not store the full meeting URL or passcode in notification metadata.
+
 ## What belongs in the public repository
 
 Only source code, documentation, generated illustrations and fictional fixtures. All example meeting links use reserved documentation domains; placeholder meeting IDs and passcodes are not live credentials. Personal data and the original development history are not part of this public export.

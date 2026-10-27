@@ -392,6 +392,7 @@ struct ModelTests {
         brokenReminder.configure(store: reminderStore); brokenReminder.setPopups(false)
         let keptReminderData = try Data(contentsOf: brokenReminderFile)
         check(keptReminderData == originalReminderData && !brokenReminder.message.isEmpty, "Unreadable reminder records are preserved and reported rather than overwritten")
-        print("All model, planning, focus, deadline, Canvas and synchronization checks passed.")
+        try EventTests.run(root: root)
+        print("All model, planning, focus, deadline, meeting, Canvas and synchronization checks passed.")
     }
 }
