@@ -12,7 +12,7 @@ Cloud calendar synchronization belongs to macOS and the calendar provider. Openi
 
 ## What is saved
 
-Tasks, copied calendar events, notes, imported original text, meeting details, draft text, focus sessions and reminder decisions are saved locally. Completing a calendar item changes only the app's local state.
+Tasks, copied calendar events, notes, imported original text, meeting details, draft text, focus sessions and reminder decisions are saved locally. Completing or editing a calendar item changes only the app's local state. Local corrections and the latest calendar snapshot are saved in the task document; edited fields are protected from subsequent sync. Restoring the calendar version releases those corrections.
 
 Normal documents live under `~/Library/Application Support/io.github.amalia6767.wodue/`. `--data-dir` can select a different directory. Demo documents live under the ignored `.build/demo-data/` directory and calendar connection is disabled in demo mode.
 

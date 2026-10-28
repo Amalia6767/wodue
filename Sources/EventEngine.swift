@@ -41,10 +41,10 @@ struct EventNotice: Equatable {
 enum EventEngine {
     static func item(_ task: Todo) -> EventItem? {
         guard !task.completed, task.resolvedKind != .deadline, task.resolvedKind != .rest,
-              task.calendarSource?.allDay != true, let minute = task.startMinute,
+              (task.calendarSource?.allDay != true || task.hasCalendarTimeOverride), let minute = task.startMinute,
               let start = ClockText.date(task.day, minute) else { return nil }
         // Calendar mirrors split an overnight event into days. Remind only at its real start.
-        if let source = task.calendarSource, Day.key(source.eventStart) != task.day { return nil }
+        if let source = task.calendarSource, !task.hasCalendarTimeOverride, Day.key(source.eventStart) != task.day { return nil }
         let end = task.endMinute.flatMap { ClockText.date(task.lastDay, $0) }
         let expires = min(start.addingTimeInterval(15 * 60), end ?? .distantFuture)
         return EventItem(task: task, start: start, expires: expires)

@@ -1,12 +1,12 @@
 # 我Due！ · WoDue
 
-**DDL 别丢，生活照过。** · Public preview 0.2.0
+**DDL 别丢，生活照过。** · Public preview 0.3.0
 
 A quiet macOS desktop planner that gets louder as deadlines approach.
 
 ![WoDue concept illustration with fictional tasks](docs/preview.svg)
 
-[下载 macOS 版（Apple Silicon）](https://github.com/Amalia6767/wodue/releases/tag/v0.2.0) · [中文使用说明](docs/使用说明.md) · [Privacy](docs/PRIVACY.md) · [MIT License](LICENSE)
+[下载 macOS 版（Apple Silicon）](https://github.com/Amalia6767/wodue/releases/tag/v0.3.0) · [中文使用说明](docs/使用说明.md) · [Privacy](docs/PRIVACY.md) · [MIT License](LICENSE)
 
 我Due！为课程作业、邮件通知、Presentation 和个人活动交织的生活而做：把未来节点落实为今天的时间安排，再用专注与休息一段段推进。
 
@@ -23,7 +23,7 @@ A quiet macOS desktop planner that gets louder as deadlines approach.
 | Desktop reminders | Grouped cards, acknowledgment, 30-minute snooze and completion. A snooze never hides an exact deadline past its cutoff. |
 | Meeting alerts | Timed activities warn 15 minutes before their start and again at the start. Cards and notification actions open saved meeting links; five-minute snoozes stop at the start time. |
 | Focus and breaks | 25/5, 50/10 or custom rounds; pause/resume, a menu-bar timer and a hard stop at the end of a planned block. |
-| Mac Calendar | Read-only mirroring of selected calendars through EventKit. Local completion never changes source events. |
+| Mac Calendar | Read-only mirroring of selected calendars through EventKit. Local completion never changes source events. Imported items can be edited locally, with per-field corrections protected from later sync and an option to restore the latest calendar version. |
 | Paste to import | Local parsing of email/event text and Canvas assignments/notices, with an editable preview before saving. |
 | Deadline updates | Canvas publication time decides which notification wins, including when a newer notice moves a deadline earlier. |
 | Local data | JSON persistence, import/export, and separate focus/reminder state. No app-owned cloud service. |

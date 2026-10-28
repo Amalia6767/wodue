@@ -621,7 +621,7 @@ private struct TaskRow: View {
             .buttonStyle(.plain)
             .accessibilityLabel(task.title + (task.completed ? "，已完成，点击恢复" : "，未完成，点击完成"))
             Menu {
-                Button(task.calendarSource == nil ? "编辑事项" : "查看日历事项", action: onEdit)
+                Button("编辑事项", action: onEdit)
                 Button(task.completed ? "标为未完成" : "标为已完成", action: onToggle)
                 if let url = WebLink.safe(task.link) { Button(task.canvasSource == nil ? "打开链接" : "打开 Canvas") { NSWorkspace.shared.open(url) } }
                 Divider()
@@ -636,7 +636,7 @@ private struct TaskRow: View {
         .padding(.vertical, 11)
         .onHover { hovering = $0 }
         .contextMenu {
-            Button(task.calendarSource == nil ? "编辑事项" : "查看日历事项", action: onEdit)
+            Button("编辑事项", action: onEdit)
             Button(task.completed ? "标为未完成" : "标为已完成", action: onToggle)
             if let url = WebLink.safe(task.link) { Button(task.canvasSource == nil ? "打开链接" : "打开 Canvas") { NSWorkspace.shared.open(url) } }
             Divider()

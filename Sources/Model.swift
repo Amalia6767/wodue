@@ -9,6 +9,52 @@ struct CalendarReference: Codable, Equatable {
     var eventStart: Date
 }
 
+// Fields owned by the source calendar, saved separately from local corrections.
+enum CalendarField: String, Codable, CaseIterable {
+    case title, time, notes, link
+}
+
+struct CalendarContent: Codable, Equatable {
+    var title: String
+    var day: String
+    var startMinute: Int?
+    var endMinute: Int?
+    var endDay: String?
+    var notes: String?
+    var link: String?
+
+    init(_ task: Todo) {
+        title = task.title; day = task.day; startMinute = task.startMinute
+        endMinute = task.endMinute; endDay = task.endDay; notes = task.notes; link = task.link
+    }
+    func differences(from other: CalendarContent) -> Set<CalendarField> {
+        var result = Set<CalendarField>()
+        if title != other.title { result.insert(.title) }
+        if day != other.day || startMinute != other.startMinute || endMinute != other.endMinute || endDay != other.endDay { result.insert(.time) }
+        if notes != other.notes { result.insert(.notes) }
+        if link != other.link { result.insert(.link) }
+        return result
+    }
+    func apply(to task: inout Todo, fields: Set<CalendarField> = Set(CalendarField.allCases)) {
+        if fields.contains(.title) { task.title = title }
+        if fields.contains(.time) { task.day = day; task.startMinute = startMinute; task.endMinute = endMinute; task.endDay = endDay }
+        if fields.contains(.notes) { task.notes = notes }
+        if fields.contains(.link) { task.link = link }
+    }
+    var isValid: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && title.count <= 2000
+        && (notes?.count ?? 0) <= 100_000 && Day.date(day) != nil
+        && (endDay.map { Day.date($0) != nil && $0 >= day && $0 <= Day.adding(366, to: day) } ?? true)
+        && (startMinute.map { (0..<1440).contains($0) } ?? true)
+        && (endMinute.map { end in startMinute.map { ((endDay ?? day) > day || end > $0) && (0..<1440).contains(end) } ?? false } ?? true)
+    }
+}
+
+struct CalendarEdits: Codable, Equatable {
+    var source: CalendarContent
+    var fields: Set<CalendarField>
+}
+
 struct Todo: Identifiable, Codable, Equatable {
     var id: UUID = UUID()
     var title: String
@@ -26,11 +72,13 @@ struct Todo: Identifiable, Codable, Equatable {
     var importance: Int? = nil
     var estimatedMinutes: Int? = nil
     var endDay: String? = nil
+    var calendarEdits: CalendarEdits? = nil
 
     var resolvedKind: PlanKind {
         kind ?? (canvasSource?.isDeadline == true || (lastDay == day && DeadlineEngine.titleSignalsDeadline(title))
             ? .deadline : (calendarSource != nil ? .event : .task))
     }
+    var hasCalendarTimeOverride: Bool { calendarEdits?.fields.contains(.time) == true }
     var lastDay: String { endDay ?? day }
     func occurs(on key: String) -> Bool { day <= key && key <= lastDay }
     func start(on key: String) -> Int? { guard occurs(on: key) else { return nil }; return key == day ? startMinute : (startMinute == nil ? nil : 0) }
@@ -43,7 +91,7 @@ struct Todo: Identifiable, Codable, Equatable {
     var timeLabel: String? {
         guard let startMinute else {
             if resolvedKind == .deadline { return "截止当天" }
-            return calendarSource?.allDay == true ? "全天" : nil
+            return calendarSource?.allDay == true && !hasCalendarTimeOverride ? "全天" : nil
         }
         let start = (resolvedKind == .deadline ? "截止 " : "") + String(format: "%02d:%02d", startMinute / 60, startMinute % 60)
         if resolvedKind == .deadline { return start }
@@ -53,7 +101,7 @@ struct Todo: Identifiable, Codable, Equatable {
 }
 
 struct TodoDocument: Codable {
-    var version: Int = 2
+    var version: Int = 3
     var tasks: [Todo]
     var categories: [PlanCategory]? = nil
     var timeBlocks: [TimeBlock]? = nil
@@ -164,7 +212,7 @@ final class TodoStore: ObservableObject {
 
     static func decode(_ data: Data) throws -> [Todo] {
         let doc = try JSONDecoder().decode(TodoDocument.self, from: data)
-        guard (1...2).contains(doc.version) else { throw StoreError.invalidDocument("这个备份的版本暂不支持。") }
+        guard (1...3).contains(doc.version) else { throw StoreError.invalidDocument("这个备份的版本暂不支持。") }
         var ids = Set<UUID>()
         for t in doc.tasks {
             guard ids.insert(t.id).inserted,
@@ -179,6 +227,13 @@ final class TodoStore: ObservableObject {
                   t.endMinute.map({ end in t.startMinute.map { (t.lastDay > t.day || end > $0) && (0..<1440).contains(end) } ?? false }) ?? true
             else { throw StoreError.invalidDocument("备份包含不正确的日期、时间或重复事项，请检查文件。") }
         }
+        for t in doc.tasks {
+            if let edits = t.calendarEdits {
+                guard t.calendarSource != nil, edits.source.isValid, !edits.fields.isEmpty,
+                      CalendarContent(t).differences(from: edits.source).isSubset(of: edits.fields)
+                else { throw StoreError.invalidDocument("日历修正记录不完整，原文件已保留。") }
+            }
+        }
         let categories = doc.categories ?? []
         guard Set(categories.map(\.id)).count == categories.count,
               categories.allSatisfy({ !$0.id.isEmpty && !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.name.count <= 40 && $0.color <= 0xFFFFFF })
@@ -192,6 +247,7 @@ final class TodoStore: ObservableObject {
 
     func tasks(on day: String) -> [Todo] {
         tasks.filter { $0.occurs(on: day) }.sorted {
+            if $0.completed != $1.completed { return !$0.completed }
             if ($0.start(on: day) ?? 1440) != ($1.start(on: day) ?? 1440) {
                 return ($0.start(on: day) ?? 1440) < ($1.start(on: day) ?? 1440)
             }
@@ -305,15 +361,20 @@ final class TodoStore: ObservableObject {
         var handled = Set<String>()
         for old in tasks {
             guard let source = old.calendarSource else { next.append(old); continue }
-            guard selectedIDs.contains(source.calendarID) else { continue }
+            guard selectedIDs.contains(source.calendarID) else { if old.calendarEdits != nil { next.append(old) }; continue }
             if var updated = byKey[source.key] {
                 guard handled.insert(source.key).inserted else { continue }
                 updated.id = old.id
                 updated.completed = old.completed
                 updated.createdAt = old.createdAt
                 updated.categoryID = old.categoryID; updated.importance = old.importance; updated.estimatedMinutes = old.estimatedMinutes; updated.kind = old.kind
+                if let edits = old.calendarEdits {
+                    let latestSource = CalendarContent(updated)
+                    CalendarContent(old).apply(to: &updated, fields: edits.fields)
+                    updated.calendarEdits = CalendarEdits(source: latestSource, fields: edits.fields)
+                }
                 next.append(updated)
-            } else if old.day < startDay || old.day >= endDay {
+            } else if old.calendarEdits != nil || old.day < startDay || old.day >= endDay {
                 next.append(old)
             }
         }
@@ -322,6 +383,39 @@ final class TodoStore: ObservableObject {
             next.append(task)
         }
         return next == tasks || commit(next)
+    }
+
+    // Merge only fields changed in the editor. A calendar refresh or completion
+    // toggle that happened while the sheet was open must not be reverted by Save.
+    @discardableResult
+    func saveEdits(_ edited: Todo, original: Todo?, restoreCalendar: Bool = false) -> Bool {
+        guard let original else { return upsert(edited) }
+        guard let current = tasks.first(where: { $0.id == original.id }), current.id == edited.id else {
+            errorMessage = "这件事项已被移除，请关闭编辑后重新查看。"
+            return false
+        }
+        var updated = current
+        var clean = edited
+        clean.title = clean.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let changed = CalendarContent(clean).differences(from: CalendarContent(original))
+        if current.calendarSource != nil {
+            let source = current.calendarEdits?.source ?? CalendarContent(current)
+            if restoreCalendar { source.apply(to: &updated) }
+            CalendarContent(clean).apply(to: &updated, fields: changed)
+            var overrides = restoreCalendar ? Set<CalendarField>() : (current.calendarEdits?.fields ?? [])
+            let differences = CalendarContent(updated).differences(from: source)
+            for field in changed {
+                if differences.contains(field) { overrides.insert(field) } else { overrides.remove(field) }
+            }
+            updated.calendarEdits = overrides.isEmpty ? nil : CalendarEdits(source: source, fields: overrides)
+        } else {
+            CalendarContent(clean).apply(to: &updated, fields: changed)
+        }
+        if clean.categoryID != original.categoryID { updated.categoryID = clean.categoryID }
+        if (clean.importance ?? 1) != (original.importance ?? 1) { updated.importance = clean.importance }
+        if clean.resolvedKind != original.resolvedKind { updated.kind = clean.kind }
+        if clean.estimatedMinutes != original.estimatedMinutes { updated.estimatedMinutes = clean.estimatedMinutes }
+        return commit(tasks.map { $0.id == updated.id ? updated : $0 })
     }
 
     @discardableResult

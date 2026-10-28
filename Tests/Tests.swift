@@ -21,12 +21,13 @@ struct ModelTests {
         check(store.tasks(on: "2026-10-26").first?.timeLabel == "10:00 – 11:00", "The fictional morning walk uses its explicit time range")
         let coffee = store.tasks(on: "2026-10-26")[0]
         store.toggle(coffee.id)
-        check(store.tasks(on: coffee.day)[0].completed, "Completing a task keeps it in its original position")
+        check(store.tasks(on: coffee.day).last?.id == coffee.id && store.tasks(on: coffee.day).dropLast().allSatisfy { !$0.completed }, "Completing a timed task moves it behind unfinished tasks without hiding its content")
         check(store.tasks.count == 10, "Completed content remains in the list")
         let reloaded = TodoStore(fileURL: file)
         check(reloaded.tasks.first(where: { $0.id == coffee.id })?.completed == true, "Completion persists across app restarts")
         store.toggle(coffee.id)
         check(store.tasks.first(where: { $0.id == coffee.id })?.completed == false, "A completed task can be restored")
+        check(store.tasks(on: coffee.day).first?.id == coffee.id, "Unchecking a task restores its chronological position among unfinished tasks")
 
         let early = Todo(title: "早上的事项", day: "2026-10-26", startMinute: 540, endMinute: 570)
         check(store.upsert(early), "Adding a timed task succeeds")
@@ -393,6 +394,7 @@ struct ModelTests {
         let keptReminderData = try Data(contentsOf: brokenReminderFile)
         check(keptReminderData == originalReminderData && !brokenReminder.message.isEmpty, "Unreadable reminder records are preserved and reported rather than overwritten")
         try EventTests.run(root: root)
+        try CalendarEditTests.run(root: root)
         print("All model, planning, focus, deadline, meeting, Canvas and synchronization checks passed.")
     }
 }

@@ -319,7 +319,7 @@ private struct DesktopNoteView: View {
                         .accessibilityLabel(task.title + (task.completed ? "，已完成，点击恢复" : "，未完成，点击完成"))
                         .contextMenu {
                             Button(task.completed ? "恢复为未完成" : "标为已完成") { store.toggle(task.id) }
-                            Button(task.calendarSource == nil ? "在完整清单中编辑" : "查看日历事项") { controller.edit(task) }
+                            Button("在完整清单中编辑") { controller.edit(task) }
                             if task.calendarSource != nil { Button("在系统日历中打开") { CalendarNavigation.open(task) } }
                             if let url = WebLink.safe(task.link) { Button(task.canvasSource == nil ? "打开链接" : "打开 Canvas") { NSWorkspace.shared.open(url) } }
                         }

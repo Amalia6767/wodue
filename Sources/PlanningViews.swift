@@ -194,7 +194,7 @@ struct DailyPlannerView: View {
                             }.font(.system(size: 10)).disabled(focus.session != nil)
                         }
                     } else {
-                        Text(item.task?.calendarSource != nil ? "日历活动" : "事项中的时间").font(.system(size: 9)).foregroundColor(Palette.secondary)
+                        Text(item.task?.calendarEdits != nil ? "日历活动 · 本机修正" : (item.task?.calendarSource != nil ? "日历活动" : "事项中的时间")).font(.system(size: 9)).foregroundColor(Palette.secondary)
                         Spacer()
                     }
                 }

@@ -23,11 +23,14 @@ struct TaskEditor: View {
     @EditorState private var estimate: Int
     @EditorState private var hasEstimate: Bool
     @EditorState private var showCategories = false
+    @EditorState private var baseline: Todo?
+    @EditorState private var restoringCalendar = false
     @FocusState private var titleFocused: Bool
 
     init(store: TodoStore, item: EditorItem, onSaved: @escaping (Todo) -> Void) {
         self.store = store; self.item = item; self.onSaved = onSaved
         let task = item.task
+        _baseline = State(initialValue: task)
         _title = State(initialValue: task?.title ?? "")
         _date = State(initialValue: Day.date(item.day) ?? Date())
         _lastDate = State(initialValue: Day.date(task?.lastDay ?? item.day) ?? Date())
@@ -54,7 +57,7 @@ struct TaskEditor: View {
                 VStack(alignment: .leading, spacing: 7) {
                     Text(synced ? "日历里的这件事。" : "给未来，留一个位置。")
                         .font(.system(size: 23, weight: .medium, design: .serif))
-                    Text(synced ? "时间由原日历同步；分类、优先级和预计用时可以自己设置。" : "这里记节点与活动；每天做多少，可以另外安排时间块。")
+                    Text(synced ? "可以修改时间和内容；修正保存在本机，提醒跟随新时间。" : "这里记节点与活动；每天做多少，可以另外安排时间块。")
                         .font(.system(size: 10)).foregroundColor(Palette.secondary)
                 }
                 Spacer()
@@ -62,9 +65,21 @@ struct TaskEditor: View {
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
+                    if synced {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label(restoringCalendar ? "保存后恢复日历同步" : (item.task?.calendarEdits == nil ? "来自日历 · 可在这里编辑" : "已在本机修正"), systemImage: "calendar.badge.pencil")
+                                .foregroundColor(Palette.pink)
+                            Text("改过的字段以本机为准，其余内容继续同步。不会修改原日历。")
+                                .font(.system(size: 10)).foregroundColor(Palette.secondary)
+                            if item.task?.calendarEdits != nil && !restoringCalendar {
+                                Button("恢复日历版本", action: restoreCalendarVersion).font(.system(size: 11))
+                            }
+                        }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Palette.blush.opacity(0.45), in: RoundedRectangle(cornerRadius: 9))
+                    }
                     TextField("要完成或参加什么？", text: $title, axis: .vertical)
                         .lineLimit(2...4).font(.system(size: 14)).textFieldStyle(.plain)
-                        .padding(13).background(.white, in: RoundedRectangle(cornerRadius: 9)).focused($titleFocused).disabled(synced)
+                        .padding(13).background(.white, in: RoundedRectangle(cornerRadius: 9)).focused($titleFocused)
                         .accessibilityLabel("事项内容")
                     Picker("性质", selection: $kind) {
                         ForEach(PlanKind.allCases, id: \.self) { Text($0.rawValue).tag($0) }
@@ -99,7 +114,7 @@ struct TaskEditor: View {
                             if hasEnd && kind != .deadline { DatePicker("结束时刻", selection: $end, displayedComponents: .hourAndMinute).datePickerStyle(.field) }
                             if invalidTime { Text("同一天的结束时刻需晚于开始时刻。").foregroundColor(Palette.pink) }
                         }
-                    }.disabled(synced).environment(\.locale, Locale(identifier: "zh_CN"))
+                    }.environment(\.locale, Locale(identifier: "zh_CN"))
                     if kind != .rest {
                         HStack {
                             Toggle("预计需要", isOn: $hasEstimate).toggleStyle(.checkbox)
@@ -109,8 +124,8 @@ struct TaskEditor: View {
                             }
                         }
                     }
-                    TextField("活动链接 / 网址（可选）", text: $link).textFieldStyle(.roundedBorder).disabled(synced)
-                    TextField("备注、地址、会议号…", text: $notes, axis: .vertical).lineLimit(2...5).textFieldStyle(.roundedBorder).disabled(synced)
+                    TextField("活动链接 / 网址（可选）", text: $link).textFieldStyle(.roundedBorder)
+                    TextField("备注、地址、会议号…", text: $notes, axis: .vertical).lineLimit(2...5).textFieldStyle(.roundedBorder)
                     if kind == .deadline { Text("提前三天突出提醒，今天、两小时内及半小时内逐级弹出。未填写时刻时只按日期提醒，不会猜测 23:59。准备工作可另排时间块。").font(.system(size: 10)).foregroundColor(Palette.secondary) }
                 }.font(.system(size: 12)).padding(.trailing, 5)
             }
@@ -126,19 +141,31 @@ struct TaskEditor: View {
             .sheet(isPresented: $showCategories) { CategoryManagerView(store: store) }
             .onChange(of: store.categories) { _, _ in if store.category(categoryID) == nil { categoryID = "" } }
     }
+    private func restoreCalendarVersion() {
+        guard var task = item.task,
+              let current = store.tasks.first(where: { $0.id == task.id }),
+              let source = current.calendarEdits?.source else { return }
+        source.apply(to: &task)
+        baseline = task
+        title = task.title; date = Day.date(task.day)!
+        lastDate = Day.date(task.lastDay)!; multiDay = task.lastDay > task.day
+        hasTime = task.startMinute != nil; hasEnd = task.endMinute != nil
+        start = ClockText.date(Day.today, task.startMinute ?? 600)!
+        end = ClockText.date(Day.today, task.endMinute ?? 660)!
+        notes = task.notes ?? ""; link = task.link ?? ""
+        restoringCalendar = true
+    }
     private func save() {
         guard valid else { return }
         var task = item.task ?? Todo(title: "", day: item.day)
-        if !synced {
-            task.title = title; task.day = Day.key(date)
-            task.endDay = multiDay && kind != .deadline ? Day.key(lastDate) : nil
-            task.startMinute = hasTime ? ClockText.minuteNow(start) : nil
-            task.endMinute = hasTime && hasEnd && kind != .deadline ? ClockText.minuteNow(end) : nil
-            task.kind = kind; task.notes = notes.isEmpty ? nil : notes; task.link = WebLink.safe(link)?.absoluteString
-        }
+        task.title = title; task.day = Day.key(date)
+        task.endDay = multiDay && kind != .deadline ? Day.key(lastDate) : nil
+        task.startMinute = hasTime ? ClockText.minuteNow(start) : nil
+        task.endMinute = hasTime && hasEnd && kind != .deadline ? ClockText.minuteNow(end) : nil
+        task.kind = kind; task.notes = notes.isEmpty ? nil : notes; task.link = WebLink.safe(link)?.absoluteString
         task.categoryID = categoryID.isEmpty ? nil : categoryID; task.importance = importance
-        task.kind = kind
         task.estimatedMinutes = hasEstimate ? estimate : nil
-        if store.upsert(task) { onSaved(task); dismiss() }
+        if store.saveEdits(task, original: baseline, restoreCalendar: restoringCalendar),
+           let saved = store.tasks.first(where: { $0.id == task.id }) { onSaved(saved); dismiss() }
     }
 }
