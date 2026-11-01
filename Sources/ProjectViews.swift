@@ -205,70 +205,140 @@ struct ProjectDetailView: View {
     @ProjectState private var taskEditor: EditorItem?
     @ProjectState private var outcome = 0
     private var project: LifeProject? { store.projects.first { $0.id == id } }
+    private var milestones: [Todo] {
+        store.tasks.filter { $0.projectID == id }.sorted {
+            if $0.completed != $1.completed { return !$0.completed }
+            if $0.day != $1.day { return $0.day < $1.day }
+            return $0.title < $1.title
+        }
+    }
+    private var recentLogs: [FocusLog] {
+        Array(clock.logs.filter { $0.projectID == id }.suffix(30).reversed())
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            HStack { Text(project?.title ?? "项目记录").font(.system(size: 23, weight: .medium, design: .serif)); Spacer(); Button("关闭") { dismiss() } }
+            header
             if let project {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        Text(project.countdown() + " · 累计投入 " + ClockText.duration(clock.projectSeconds(id) / 60)).foregroundColor(Palette.pink)
-                        Text("剩余计划 \(ClockText.duration(project.plannedMinutes(from: Day.today))) · 修改未来计划不会改变已投入时间。").font(.system(size: 11)).foregroundColor(Palette.secondary)
-                        HStack {
-                            DatePicker("选择日期", selection: Binding(get: { Day.date(selectedDay)! }, set: { selectedDay = Day.key($0) }), in: Day.date(project.startDay)!...Day.date(project.dueDay)!, displayedComponents: .date).datePickerStyle(.field)
-                            Button("调整这一天") { planEditor = ProjectDaySelection(projectID: id, day: selectedDay) }
-                        }.environment(\.locale, Locale(identifier: "zh_CN"))
-                        Text("每天的安排与实际投入").font(.system(size: 15, weight: .medium))
-                        LazyVStack(spacing: 0) {
-                            ForEach(project.days.filter { $0 >= selectedDay }.prefix(21), id: \.self) { day in
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 5) {
-                                        Text(Day.formatted(day, "M月d日 EEE")).font(.system(size: 12, weight: .medium))
-                                        let plan = project.plan(on: day)
-                                        Text(plan.minutes == 0 ? "休息 / 不安排" : "计划 " + ClockText.duration(plan.minutes) + (plan.startMinute.map { " · " + ClockText.minute($0) + "–" + ClockText.minute($0 + plan.minutes) } ?? " · 灵活完成"))
-                                            .font(.system(size: 10)).foregroundColor(Palette.secondary)
-                                    }
-                                    Spacer()
-                                    Text("实际 " + ClockText.duration(clock.projectSeconds(id, on: day) / 60)).font(.system(size: 11)).foregroundColor(Palette.green)
-                                    Button("调整") { planEditor = ProjectDaySelection(projectID: id, day: day) }.font(.system(size: 11))
-                                }.padding(.vertical, 12)
-                                Divider().opacity(0.4)
-                            }
-                        }
-                        if let target = project.outcomeTarget {
-                            HStack {
-                                Text("成果进度"); TextField("已完成", value: $outcome, format: .number).textFieldStyle(.roundedBorder).frame(width: 90)
-                                Text("/ \(target) \(project.outcomeUnit)")
-                                Button("记录成果") { if var latest = self.project { latest.outcomeProgress = outcome; _ = store.upsertProject(latest) } }.disabled(!(0...1_000_000_000).contains(outcome))
-                            }
-                        }
-                        HStack {
-                            Text("项目节点").font(.system(size: 15, weight: .medium)); Spacer()
-                            Button("添加节点") { var task = Todo(title: "", day: project.dueDay); task.kind = .deadline; task.projectID = id; taskEditor = EditorItem(task: task, day: task.day) }
-                        }
-                        ForEach(store.tasks.filter { $0.projectID == id }.sorted { ($0.completed ? 1 : 0, $0.day, $0.title) < ($1.completed ? 1 : 0, $1.day, $1.title) }) { task in
-                            HStack {
-                                Button { store.toggle(task.id) } label: { Image(systemName: task.completed ? "checkmark.circle.fill" : "circle") }.buttonStyle(.plain)
-                                Button(task.title) { taskEditor = EditorItem(task: task, day: task.day) }.buttonStyle(.plain).strikethrough(task.completed)
-                                Spacer(); Text(task.dateLabel).font(.system(size: 10)).foregroundColor(Palette.secondary)
-                            }
-                        }
-                        Divider()
-                        Text("最近的专注记录").font(.system(size: 15, weight: .medium))
-                        ForEach(clock.logs.filter { $0.projectID == id }.suffix(30).reversed()) { log in
-                            HStack { Text(Day.formatted(log.day, "M月d日")); Text(log.title).lineLimit(1); Spacer(); Text(ClockText.duration(log.seconds / 60)) }.font(.system(size: 11)).foregroundColor(Palette.secondary)
-                        }
-                        if !clock.logs.contains(where: { $0.projectID == id }) { Text("第一次专注后，记录会留在这里。运行中的投入会实时显示在项目卡片。").font(.system(size: 11)).foregroundColor(Palette.secondary) }
-                        if !clock.notificationsEnabled && clock.canRequestNotifications { Button("开启项目、时段与专注提醒") { clock.requestNotifications() } }
-                        Text("系统项目提醒只安排最近的三个提醒时间；保持应用运行或定期打开，会续排后续提醒。当天投入达到目标后会撤回尚未发送的当天提醒。")
-                            .font(.system(size: 10)).foregroundColor(Palette.secondary)
-                        if !clock.message.isEmpty { Text(clock.message).font(.system(size: 11)).foregroundColor(Palette.green) }
-                    }.padding(.trailing, 6)
-                }
+                ScrollView { contents(project).padding(.trailing, 6) }
             }
         }.padding(26).frame(width: 730, height: 720).background(Palette.paper).foregroundColor(Palette.ink).tint(Palette.pink)
             .onAppear { if let p = project { selectedDay = min(max(Day.today, p.startDay), p.dueDay); outcome = p.outcomeProgress } }
             .sheet(item: $planEditor) { ProjectDayEditor(store: store, selection: $0) }
             .sheet(item: $taskEditor) { item in TaskEditor(store: store, item: item) { _ in } }
+    }
+    private var header: some View {
+        HStack {
+            Text(project?.title ?? "项目记录").font(.system(size: 23, weight: .medium, design: .serif))
+            Spacer()
+            Button("关闭") { dismiss() }
+        }
+    }
+    private func contents(_ project: LifeProject) -> some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text(project.countdown() + " · 累计投入 " + ClockText.duration(clock.projectSeconds(id) / 60)).foregroundColor(Palette.pink)
+            Text("剩余计划 \(ClockText.duration(project.plannedMinutes(from: Day.today))) · 修改未来计划不会改变已投入时间。")
+                .font(.system(size: 11)).foregroundColor(Palette.secondary)
+            scheduleSection(project)
+            outcomeSection(project)
+            milestoneSection(project)
+            Divider()
+            historySection
+            reminderSection
+        }
+    }
+    private func scheduleSection(_ project: LifeProject) -> some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                DatePicker("选择日期", selection: Binding(get: { Day.date(selectedDay)! }, set: { selectedDay = Day.key($0) }), in: Day.date(project.startDay)!...Day.date(project.dueDay)!, displayedComponents: .date).datePickerStyle(.field)
+                Button("调整这一天") { planEditor = ProjectDaySelection(projectID: id, day: selectedDay) }
+            }.environment(\.locale, Locale(identifier: "zh_CN"))
+            Text("每天的安排与实际投入").font(.system(size: 15, weight: .medium))
+            LazyVStack(spacing: 0) {
+                ForEach(Array(project.days.filter { $0 >= selectedDay }.prefix(21)), id: \.self) { day in
+                    dayRow(day, project: project)
+                    Divider().opacity(0.4)
+                }
+            }
+        }
+    }
+    private func planDescription(_ plan: ProjectDayPlan) -> String {
+        guard plan.minutes > 0 else { return "休息 / 不安排" }
+        let timing = plan.startMinute.map { " · " + ClockText.minute($0) + "–" + ClockText.minute($0 + plan.minutes) } ?? " · 灵活完成"
+        return "计划 " + ClockText.duration(plan.minutes) + timing
+    }
+    private func dayRow(_ day: String, project: LifeProject) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(Day.formatted(day, "M月d日 EEE")).font(.system(size: 12, weight: .medium))
+                Text(planDescription(project.plan(on: day))).font(.system(size: 10)).foregroundColor(Palette.secondary)
+            }
+            Spacer()
+            Text("实际 " + ClockText.duration(clock.projectSeconds(id, on: day) / 60)).font(.system(size: 11)).foregroundColor(Palette.green)
+            Button("调整") { planEditor = ProjectDaySelection(projectID: id, day: day) }.font(.system(size: 11))
+        }.padding(.vertical, 12)
+    }
+    @ViewBuilder private func outcomeSection(_ project: LifeProject) -> some View {
+        if let target = project.outcomeTarget {
+            HStack {
+                Text("成果进度")
+                TextField("已完成", value: $outcome, format: .number).textFieldStyle(.roundedBorder).frame(width: 90)
+                Text("/ \(target) \(project.outcomeUnit)")
+                Button("记录成果") {
+                    if var latest = self.project { latest.outcomeProgress = outcome; _ = store.upsertProject(latest) }
+                }.disabled(!(0...1_000_000_000).contains(outcome))
+            }
+        }
+    }
+    private func milestoneSection(_ project: LifeProject) -> some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                Text("项目节点").font(.system(size: 15, weight: .medium))
+                Spacer()
+                Button("添加节点") {
+                    var task = Todo(title: "", day: project.dueDay)
+                    task.kind = .deadline; task.projectID = id
+                    taskEditor = EditorItem(task: task, day: task.day)
+                }
+            }
+            ForEach(milestones) { task in milestoneRow(task) }
+        }
+    }
+    private func milestoneRow(_ task: Todo) -> some View {
+        HStack {
+            Button { store.toggle(task.id) } label: {
+                Image(systemName: task.completed ? "checkmark.circle.fill" : "circle")
+            }.buttonStyle(.plain)
+            Button(task.title) { taskEditor = EditorItem(task: task, day: task.day) }.buttonStyle(.plain).strikethrough(task.completed)
+            Spacer()
+            Text(task.dateLabel).font(.system(size: 10)).foregroundColor(Palette.secondary)
+        }
+    }
+    private var historySection: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("最近的专注记录").font(.system(size: 15, weight: .medium))
+            ForEach(recentLogs) { log in
+                HStack {
+                    Text(Day.formatted(log.day, "M月d日"))
+                    Text(log.title).lineLimit(1)
+                    Spacer()
+                    Text(ClockText.duration(log.seconds / 60))
+                }.font(.system(size: 11)).foregroundColor(Palette.secondary)
+            }
+            if recentLogs.isEmpty {
+                Text("第一次专注后，记录会留在这里。运行中的投入会实时显示在项目卡片。")
+                    .font(.system(size: 11)).foregroundColor(Palette.secondary)
+            }
+        }
+    }
+    private var reminderSection: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            if !clock.notificationsEnabled && clock.canRequestNotifications {
+                Button("开启项目、时段与专注提醒") { clock.requestNotifications() }
+            }
+            Text("系统项目提醒只安排最近的三个提醒时间；保持应用运行或定期打开，会续排后续提醒。当天投入达到目标后会撤回尚未发送的当天提醒。")
+                .font(.system(size: 10)).foregroundColor(Palette.secondary)
+            if !clock.message.isEmpty { Text(clock.message).font(.system(size: 11)).foregroundColor(Palette.green) }
+        }
     }
 }
 
