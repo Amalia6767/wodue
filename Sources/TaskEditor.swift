@@ -24,13 +24,15 @@ struct TaskEditor: View {
     @EditorState private var hasEstimate: Bool
     @EditorState private var showCategories = false
     @EditorState private var baseline: Todo?
+    @EditorState private var projectID: UUID?
     @EditorState private var restoringCalendar = false
     @FocusState private var titleFocused: Bool
 
     init(store: TodoStore, item: EditorItem, onSaved: @escaping (Todo) -> Void) {
         self.store = store; self.item = item; self.onSaved = onSaved
         let task = item.task
-        _baseline = State(initialValue: task)
+        _baseline = State(initialValue: task.flatMap { value in store.tasks.contains(where: { $0.id == value.id }) ? value : nil })
+        _projectID = State(initialValue: task?.projectID)
         _title = State(initialValue: task?.title ?? "")
         _date = State(initialValue: Day.date(item.day) ?? Date())
         _lastDate = State(initialValue: Day.date(task?.lastDay ?? item.day) ?? Date())
@@ -90,6 +92,12 @@ struct TaskEditor: View {
                             ForEach(store.categories) { Text($0.name).tag($0.id) }
                         }
                         Button("管理分类…") { showCategories = true }.font(.system(size: 10))
+                    }
+                    if !store.projects.isEmpty {
+                        Picker("所属项目", selection: $projectID) {
+                            Text("独立事项").tag(Optional<UUID>.none)
+                            ForEach(store.projects) { Text($0.title).tag(Optional($0.id)) }
+                        }
                     }
                     Picker("优先级", selection: $importance) {
                         Text("稍后").tag(0); Text("普通").tag(1); Text("重要").tag(2); Text("优先").tag(3)
@@ -165,6 +173,7 @@ struct TaskEditor: View {
         task.kind = kind; task.notes = notes.isEmpty ? nil : notes; task.link = WebLink.safe(link)?.absoluteString
         task.categoryID = categoryID.isEmpty ? nil : categoryID; task.importance = importance
         task.estimatedMinutes = hasEstimate ? estimate : nil
+        task.projectID = projectID
         if store.saveEdits(task, original: baseline, restoreCalendar: restoringCalendar),
            let saved = store.tasks.first(where: { $0.id == task.id }) { onSaved(saved); dismiss() }
     }

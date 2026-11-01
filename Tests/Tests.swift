@@ -395,6 +395,7 @@ struct ModelTests {
         check(keptReminderData == originalReminderData && !brokenReminder.message.isEmpty, "Unreadable reminder records are preserved and reported rather than overwritten")
         try EventTests.run(root: root)
         try CalendarEditTests.run(root: root)
+        try ProjectTests.run(root: root)
         print("All model, planning, focus, deadline, meeting, Canvas and synchronization checks passed.")
     }
 }

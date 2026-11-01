@@ -20,6 +20,7 @@ struct BlockEditor: View {
     @BlockState private var midnight: Bool
     @BlockState private var categoryID: String
     @BlockState private var taskID: String
+    @BlockState private var projectID: UUID?
     @BlockState private var notes: String
     @BlockState private var rest: Bool
     @BlockState private var slotMessage = ""
@@ -40,6 +41,7 @@ struct BlockEditor: View {
         _midnight = State(initialValue: last == 1440)
         _categoryID = State(initialValue: item.block?.categoryID ?? item.task?.categoryID ?? "")
         _taskID = State(initialValue: item.block?.taskID?.uuidString ?? item.task?.id.uuidString ?? "")
+        _projectID = State(initialValue: item.block?.projectID ?? item.task?.projectID)
         _notes = State(initialValue: item.block?.notes ?? "")
         _rest = State(initialValue: item.block?.isRest ?? (item.task?.resolvedKind == .rest || item.task?.categoryID == "rest"))
         _slotMessage = State(initialValue: item.block == nil && slot == nil ? "21:00 前暂无合适空档。当前时间仅作输入起点，请调整或换一天后保存。" : "")
@@ -51,13 +53,18 @@ struct BlockEditor: View {
         value.categoryID = categoryID.isEmpty ? nil : categoryID; value.taskID = UUID(uuidString: taskID)
         value.notes = notes.isEmpty ? nil : notes
         value.rest = rest
+        value.projectPlanDay = nil
+        value.projectID = projectID ?? store.tasks.first(where: { $0.id == value.taskID })?.projectID
         return value
     }
     private var valid: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && title.count <= 2000
         && block.endMinute > block.startMinute && notes.count <= 100_000
     }
-    private var conflicts: [BusyInterval] { PlanningEngine.conflicts(block, tasks: store.tasks, blocks: store.timeBlocks) }
+    private var conflicts: [BusyInterval] {
+        PlanningEngine.conflicts(block, tasks: store.tasks, blocks: store.timeBlocks)
+            + ProjectEngine.busy(store.projects, on: block.day, excluding: block.projectID).filter { $0.start < block.endMinute && $0.end > block.startMinute }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -79,6 +86,12 @@ struct BlockEditor: View {
                         Button("管理分类…") { categories = true }.font(.system(size: 10))
                     }
                     Toggle("这是一段休息 / 放松时间", isOn: $rest).toggleStyle(.checkbox)
+                    if !store.projects.isEmpty {
+                        Picker("所属项目", selection: $projectID) {
+                            Text("独立时段").tag(Optional<UUID>.none)
+                            ForEach(store.projects) { Text($0.title).tag(Optional($0.id)) }
+                        }
+                    }
                     DatePicker("安排日期", selection: $date, displayedComponents: .date).datePickerStyle(.field)
                     HStack(spacing: 17) {
                         DatePicker("开始", selection: $start, displayedComponents: .hourAndMinute).datePickerStyle(.field)

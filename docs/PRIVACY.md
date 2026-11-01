@@ -6,7 +6,7 @@ WoDue is a local macOS app. It has no app-owned backend, analytics SDK, advertis
 
 - Text you explicitly paste or import. The clipboard is not monitored in the background.
 - Events from calendars you connect and select through macOS EventKit. The app uses read-only operations even though macOS requires full calendar permission for reading events.
-- The app's own JSON documents and preferences.
+- The app's own JSON documents and preferences, including projects, daily effort targets and voluntarily entered outcome counts.
 
 Cloud calendar synchronization belongs to macOS and the calendar provider. Opening a link uses the system browser and visits that destination.
 
@@ -27,3 +27,5 @@ Only source code, documentation, generated illustrations and fictional fixtures.
 `.gitignore` and `scripts/privacy_check.py` help reject app data, generated bundles, credentials, private meeting URLs, real course links and local workstation paths. The scanner is not proof that arbitrary prose or an image is safe; review screenshots and example text manually.
 
 When reporting a bug, reproduce it with fictional data. Share the smallest relevant example rather than an entire data directory, inbox or calendar export.
+
+Project-aware focus records use `focus-v2.json`, retaining the original `focus.json` during migration. New logs keep stable project identities and active-time intervals; old unassigned logs are not guessed into projects. No screenshots or feedback chat content are bundled with the app.

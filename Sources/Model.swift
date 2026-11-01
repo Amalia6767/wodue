@@ -73,6 +73,7 @@ struct Todo: Identifiable, Codable, Equatable {
     var estimatedMinutes: Int? = nil
     var endDay: String? = nil
     var calendarEdits: CalendarEdits? = nil
+    var projectID: UUID? = nil
 
     var resolvedKind: PlanKind {
         kind ?? (canvasSource?.isDeadline == true || (lastDay == day && DeadlineEngine.titleSignalsDeadline(title))
@@ -101,10 +102,11 @@ struct Todo: Identifiable, Codable, Equatable {
 }
 
 struct TodoDocument: Codable {
-    var version: Int = 3
+    var version: Int = 4
     var tasks: [Todo]
     var categories: [PlanCategory]? = nil
     var timeBlocks: [TimeBlock]? = nil
+    var projects: [LifeProject]? = nil
 }
 
 enum Day {
@@ -154,6 +156,7 @@ final class TodoStore: ObservableObject {
     @Published private(set) var tasks: [Todo] = []
     @Published private(set) var categories: [PlanCategory] = PlanCategory.defaults
     @Published private(set) var timeBlocks: [TimeBlock] = []
+    @Published private(set) var projects: [LifeProject] = []
     @Published var errorMessage: String? = nil
     @Published var toast: String? = nil
     private(set) var canSave = true
@@ -179,6 +182,7 @@ final class TodoStore: ObservableObject {
                 let doc = try JSONDecoder().decode(TodoDocument.self, from: data)
                 categories = doc.categories ?? PlanCategory.defaults
                 timeBlocks = doc.timeBlocks ?? []
+                projects = doc.projects ?? []
             } else {
                 tasks = seedIfMissing ? Self.seed() : []
                 try persist(tasks)
@@ -212,7 +216,7 @@ final class TodoStore: ObservableObject {
 
     static func decode(_ data: Data) throws -> [Todo] {
         let doc = try JSONDecoder().decode(TodoDocument.self, from: data)
-        guard (1...3).contains(doc.version) else { throw StoreError.invalidDocument("这个备份的版本暂不支持。") }
+        guard (1...4).contains(doc.version) else { throw StoreError.invalidDocument("这个备份的版本暂不支持。") }
         var ids = Set<UUID>()
         for t in doc.tasks {
             guard ids.insert(t.id).inserted,
@@ -242,6 +246,11 @@ final class TodoStore: ObservableObject {
         guard Set(blocks.map(\.id)).count == blocks.count,
               blocks.allSatisfy({ !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.title.count <= 2000 && Day.date($0.day) != nil && (0..<1440).contains($0.startMinute) && $0.endMinute > $0.startMinute && $0.endMinute <= 1440 && ($0.notes?.count ?? 0) <= 100_000 })
         else { throw StoreError.invalidDocument("时间块的日期或起止时间不正确。") }
+        guard blocks.allSatisfy({ block in block.projectPlanDay == nil || (block.projectPlanDay == block.day && block.projectID != nil) })
+        else { throw StoreError.invalidDocument("项目时间块归属不正确。") }
+        let projects = doc.projects ?? []
+        guard projects.count <= 2000, Set(projects.map(\.id)).count == projects.count, projects.allSatisfy(\.valid)
+        else { throw StoreError.invalidDocument("项目日期、投入计划或目标数量不正确。") }
         return doc.tasks
     }
 
@@ -336,7 +345,7 @@ final class TodoStore: ObservableObject {
             updated.kind = candidate.source.isDeadline ? .deadline : .event
             if let old = canvasMatch(candidate.source), let i = next.firstIndex(where: { $0.id == old.id }) {
                 updated.id = old.id; updated.completed = old.completed; updated.createdAt = old.createdAt
-                updated.categoryID = old.categoryID; updated.importance = old.importance; updated.estimatedMinutes = old.estimatedMinutes; updated.kind = old.kind
+                updated.categoryID = old.categoryID; updated.importance = old.importance; updated.estimatedMinutes = old.estimatedMinutes; updated.kind = old.kind; updated.projectID = old.projectID
                 updated.canvasSource?.identities = Array(Set((old.canvasSource?.identities ?? []) + candidate.source.identities)).sorted()
                 let oldTime = old.startMinute.map { String(format: "%02d:%02d", $0 / 60, $0 % 60) } ?? "未指定时间"
                 let history = "此前截止：\(old.day) \(oldTime)"
@@ -367,7 +376,7 @@ final class TodoStore: ObservableObject {
                 updated.id = old.id
                 updated.completed = old.completed
                 updated.createdAt = old.createdAt
-                updated.categoryID = old.categoryID; updated.importance = old.importance; updated.estimatedMinutes = old.estimatedMinutes; updated.kind = old.kind
+                updated.categoryID = old.categoryID; updated.importance = old.importance; updated.estimatedMinutes = old.estimatedMinutes; updated.kind = old.kind; updated.projectID = old.projectID
                 if let edits = old.calendarEdits {
                     let latestSource = CalendarContent(updated)
                     CalendarContent(old).apply(to: &updated, fields: edits.fields)
@@ -411,11 +420,45 @@ final class TodoStore: ObservableObject {
         } else {
             CalendarContent(clean).apply(to: &updated, fields: changed)
         }
+        if clean.projectID != original.projectID { updated.projectID = clean.projectID }
         if clean.categoryID != original.categoryID { updated.categoryID = clean.categoryID }
         if (clean.importance ?? 1) != (original.importance ?? 1) { updated.importance = clean.importance }
         if clean.resolvedKind != original.resolvedKind { updated.kind = clean.kind }
         if clean.estimatedMinutes != original.estimatedMinutes { updated.estimatedMinutes = clean.estimatedMinutes }
         return commit(tasks.map { $0.id == updated.id ? updated : $0 })
+    }
+
+    @discardableResult
+    func upsertProject(_ project: LifeProject, inserting block: TimeBlock? = nil) -> Bool {
+        var clean = project; clean.title = clean.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        var next = projects
+        if let i = next.firstIndex(where: { $0.id == clean.id }) { next[i] = clean } else { next.append(clean) }
+        var blocks = timeBlocks.compactMap { old -> TimeBlock? in
+            guard old.projectID == clean.id, old.projectPlanDay != nil, !old.completed, old.day >= Day.today else { return old }
+            let plan = clean.plan(on: old.day)
+            guard !clean.completed, plan.minutes > 0, let start = plan.startMinute else { return nil }
+            var updated = old; updated.title = clean.title; updated.startMinute = start; updated.endMinute = start + plan.minutes
+            return updated
+        }
+        if let block {
+            if let i = blocks.firstIndex(where: { $0.id == block.id }) { blocks[i] = block } else { blocks.append(block) }
+        }
+        return commit(tasks, blocks: blocks, projects: next)
+    }
+    @discardableResult
+    func setProjectPlan(_ id: UUID, day: String, plan: ProjectDayPlan?, schedule: Bool = false) -> Bool {
+        guard var project = projects.first(where: { $0.id == id }), Day.date(day) != nil else { return false }
+        project.overrides[day] = plan
+        var block: TimeBlock? = nil
+        if schedule {
+            let selected = project.plan(on: day)
+            guard selected.valid, selected.minutes > 0, let start = selected.startMinute else { return false }
+            var proposed = timeBlocks.first { $0.projectID == id && $0.projectPlanDay == day && $0.day == day && !$0.completed }
+                ?? TimeBlock(title: project.title, day: day, startMinute: start, endMinute: start + selected.minutes)
+            proposed.title = project.title; proposed.startMinute = start; proposed.endMinute = start + selected.minutes
+            proposed.projectID = id; proposed.projectPlanDay = day; block = proposed
+        }
+        return upsertProject(project, inserting: block)
     }
 
     @discardableResult
@@ -454,38 +497,43 @@ final class TodoStore: ObservableObject {
         for block in doc.timeBlocks ?? [] {
             if let i = nextBlocks.firstIndex(where: { $0.id == block.id }) { nextBlocks[i] = block } else { nextBlocks.append(block) }
         }
-        guard commit(next, categories: nextCategories, blocks: nextBlocks) else { throw StoreError.invalidDocument(errorMessage ?? "保存失败") }
+        var nextProjects = projects
+        for project in doc.projects ?? [] {
+            if let i = nextProjects.firstIndex(where: { $0.id == project.id }) { nextProjects[i] = project } else { nextProjects.append(project) }
+        }
+        guard commit(next, categories: nextCategories, blocks: nextBlocks, projects: nextProjects) else { throw StoreError.invalidDocument(errorMessage ?? "保存失败") }
         toast = "已导入 \(incoming.count) 件事项"
     }
     func exportData() throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return try encoder.encode(TodoDocument(tasks: tasks, categories: categories, timeBlocks: timeBlocks))
+        return try encoder.encode(TodoDocument(tasks: tasks, categories: categories, timeBlocks: timeBlocks, projects: projects))
     }
     @discardableResult
-    private func commit(_ next: [Todo], categories newCategories: [PlanCategory]? = nil, blocks newBlocks: [TimeBlock]? = nil) -> Bool {
+    private func commit(_ next: [Todo], categories newCategories: [PlanCategory]? = nil, blocks newBlocks: [TimeBlock]? = nil, projects newProjects: [LifeProject]? = nil) -> Bool {
         guard canSave else {
             errorMessage = "数据文件暂时无法读取。为保护原文件，请先修复文件，再重新打开应用。"
             return false
         }
         do {
             let encoder = JSONEncoder()
-            let data = try encoder.encode(TodoDocument(tasks: next, categories: newCategories ?? categories, timeBlocks: newBlocks ?? timeBlocks))
+            let data = try encoder.encode(TodoDocument(tasks: next, categories: newCategories ?? categories, timeBlocks: newBlocks ?? timeBlocks, projects: newProjects ?? projects))
             _ = try Self.decode(data)
-            try persist(next, categories: newCategories, blocks: newBlocks)
+            try persist(next, categories: newCategories, blocks: newBlocks, projects: newProjects)
             tasks = next
             if let newCategories { categories = newCategories }
             if let newBlocks { timeBlocks = newBlocks }
+            if let newProjects { projects = newProjects }
             return true
         } catch {
             errorMessage = "保存失败，刚才的修改没有写入。\n" + error.localizedDescription
             return false
         }
     }
-    private func persist(_ tasks: [Todo], categories newCategories: [PlanCategory]? = nil, blocks newBlocks: [TimeBlock]? = nil) throws {
+    private func persist(_ tasks: [Todo], categories newCategories: [PlanCategory]? = nil, blocks newBlocks: [TimeBlock]? = nil, projects newProjects: [LifeProject]? = nil) throws {
         try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(TodoDocument(tasks: tasks, categories: newCategories ?? categories, timeBlocks: newBlocks ?? timeBlocks)).write(to: fileURL, options: .atomic)
+        try encoder.encode(TodoDocument(tasks: tasks, categories: newCategories ?? categories, timeBlocks: newBlocks ?? timeBlocks, projects: newProjects ?? projects)).write(to: fileURL, options: .atomic)
     }
 }

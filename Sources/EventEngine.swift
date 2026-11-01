@@ -5,6 +5,7 @@ enum ReminderBudget {
     static let deadlines = 24
     static let events = 16
     static let blocks = 10
+    static let projects = 3
 }
 
 enum EventStage: String, Codable {

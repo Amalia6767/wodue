@@ -31,6 +31,8 @@ struct TimeBlock: Identifiable, Codable, Equatable {
     var completed = false
     var notes: String? = nil
     var rest: Bool? = nil
+    var projectID: UUID? = nil
+    var projectPlanDay: String? = nil
     var createdAt = Date()
     var duration: Int { endMinute - startMinute }
     var isRest: Bool { rest ?? (categoryID == "rest") }

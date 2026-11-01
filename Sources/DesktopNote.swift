@@ -38,6 +38,7 @@ final class DesktopNoteController: ObservableObject {
     }
     private var panel: NotePanel?
     private var openMainAction: (() -> Void)?
+    private var openProjectsAction: (() -> Void)?
     private var editTaskAction: ((Todo) -> Void)?
     private var localPointerMonitor: Any?
     private var globalPointerMonitor: Any?
@@ -58,8 +59,9 @@ final class DesktopNoteController: ObservableObject {
         lightText = UserDefaults.standard.bool(forKey: "DesktopNoteLightText")
     }
 
-    func configure(store: TodoStore, openMain: @escaping () -> Void, editTask: @escaping (Todo) -> Void) {
+    func configure(store: TodoStore, openMain: @escaping () -> Void, openProjects: @escaping () -> Void, editTask: @escaping (Todo) -> Void) {
         openMainAction = openMain
+        openProjectsAction = openProjects
         editTaskAction = editTask
         guard panel == nil else { return }
         let note = NotePanel(contentRect: NSRect(x: 0, y: 0, width: 294, height: 280),
@@ -111,6 +113,7 @@ final class DesktopNoteController: ObservableObject {
         if panel?.isVisible == true { hide() } else { show() }
     }
     func openMain() { openMainAction?() }
+    func openProjects() { openProjectsAction?() }
     func edit(_ task: Todo) { editTaskAction?(task) }
 
     func refreshPointer() {
@@ -246,6 +249,7 @@ private struct DesktopNoteView: View {
                 }.buttonStyle(.plain).help("查看所有临近截止事项")
             }
 
+            ProjectNoteStrip(store: store, lightText: controller.lightText, open: controller.openProjects)
             EventNoteStrip(lightText: controller.lightText)
 
             if let session = focusClock.session {

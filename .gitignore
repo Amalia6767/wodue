@@ -12,6 +12,7 @@ outputs/
 *.ics
 tasks.json
 focus.json
+focus-v2.json
 deadline-reminders.json
 event-reminders.json
 *-draft.txt

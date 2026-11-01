@@ -92,13 +92,15 @@ struct EditorItem: Identifiable {
 
 private enum Scope: String, CaseIterable {
     case today = "今日节奏"
-    case horizon = "长期计划"
+    case projects = "长期项目"
+    case horizon = "节点与截止"
     case plan = "这几天"
     case all = "全部事项"
     var icon: String {
         switch self {
         case .plan: return "square.grid.2x2"
         case .today: return "sun.max"
+        case .projects: return "leaf"
         case .horizon: return "calendar.badge.clock"
         case .all: return "tray.full"
         }
@@ -123,7 +125,7 @@ struct ContentView: View {
         switch scope {
         case .plan: return (0..<4).map { Day.adding($0, to: anchor) }
         case .today: return [Day.today]
-        case .all, .horizon: return store.days.isEmpty ? [Day.today] : store.days
+        case .all, .horizon, .projects: return store.days.isEmpty ? [Day.today] : store.days
         }
     }
     private var filteredDays: [String] {
@@ -150,7 +152,9 @@ struct ContentView: View {
                 topbar
                 DeadlineBanner(store: store, onEdit: { editor = EditorItem(task: $0, day: $0.day) })
                 EventBanner()
-                if scope == .today {
+                if scope == .projects && selectedDay == nil {
+                    ProjectsView(store: store)
+                } else if scope == .today {
                     DailyPlannerView(store: store, day: selectedDay ?? Day.today, onDay: { selectedDay = $0; calendarMonth = Day.date($0)! }, onEdit: { editor = EditorItem(task: $0, day: $0.day) }, onAddTask: { editor = EditorItem(day: selectedDay ?? Day.today) })
                 } else if scope == .horizon && selectedDay == nil {
                     HorizonView(store: store, onEdit: { editor = EditorItem(task: $0, day: $0.day) }, onAdd: { editor = EditorItem(day: Day.today) })
@@ -195,6 +199,9 @@ struct ContentView: View {
             DesktopNoteController.shared.configure(store: store, openMain: {
                 openWindow(id: "main")
                 NSApp.activate(ignoringOtherApps: true)
+            }, openProjects: {
+                scope = .projects; selectedDay = nil
+                openWindow(id: "main"); NSApp.activate(ignoringOtherApps: true)
             }, editTask: { task in
                 openWindow(id: "main")
                 NSApp.activate(ignoringOtherApps: true)

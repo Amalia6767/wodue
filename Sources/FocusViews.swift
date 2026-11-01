@@ -3,12 +3,14 @@ import SwiftUI
 private typealias FocusStateValue<Value> = SwiftUI.State<Value>
 
 struct FocusPane: View {
+    @ObservedObject var store: TodoStore
     @ObservedObject var clock: FocusClock = .shared
     let blocks: [TimeBlock]
     let day: String
     @Binding var selectedBlock: UUID?
     @FocusStateValue private var freeTitle = ""
     @FocusStateValue private var custom = false
+    @FocusStateValue private var projectID: UUID?
 
     private var chosen: TimeBlock? { blocks.first { $0.id == selectedBlock && !$0.isRest } }
     private var canStart: Bool { day == Day.today && (chosen.map { $0.endMinute > ClockText.minuteNow() && !$0.completed } ?? true) }
@@ -39,9 +41,15 @@ struct FocusPane: View {
                     Text("自由专注").tag(Optional<UUID>.none)
                     ForEach(blocks.filter { !$0.isRest && !$0.completed }) { Text($0.title).tag(Optional($0.id)) }
                 }.labelsHidden().font(.system(size: 11))
+                if chosen == nil && !store.projects.filter({ !$0.completed }).isEmpty {
+                    Picker("计入项目", selection: $projectID) {
+                        Text("不关联项目").tag(Optional<UUID>.none)
+                        ForEach(store.projects.filter { !$0.completed }) { Text($0.title).tag(Optional($0.id)) }
+                    }.font(.system(size: 11))
+                }
                 if chosen == nil { TextField("这一轮想做什么？", text: $freeTitle).textFieldStyle(.roundedBorder).font(.system(size: 11)) }
                 Button("开始专注") {
-                    _ = clock.start(title: chosen?.title ?? freeTitle, blockID: chosen?.id, taskID: chosen?.taskID,
+                    _ = clock.start(title: chosen?.title ?? (freeTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? (store.projects.first { $0.id == projectID }?.title ?? freeTitle) : freeTitle), blockID: chosen?.id, taskID: chosen?.taskID, projectID: chosen == nil ? projectID : chosen?.projectID,
                         hardStop: chosen.flatMap { ClockText.date($0.day, $0.endMinute) })
                 }.buttonStyle(.borderedProminent).tint(Palette.pink).frame(maxWidth: .infinity).disabled(!canStart)
                 if day != Day.today { Text("未来时段先安排好，到当天再开始专注。").font(.system(size: 10)).foregroundColor(Palette.secondary) }

@@ -87,6 +87,6 @@ enum CalendarEditTests {
         let legacyTasks = try TodoStore.decode(legacy)
         check(legacyTasks == [source], "Existing version-two calendar data is migrated without changing its content")
         let document = try JSONDecoder().decode(TodoDocument.self, from: store.exportData())
-        check(document.version == 3, "Backups use a new schema version so older apps refuse to overwrite corrections")
+        check(document.version == 4, "Backups use a new schema version so older apps refuse to overwrite corrections")
     }
 }

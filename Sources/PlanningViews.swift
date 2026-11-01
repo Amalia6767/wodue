@@ -40,6 +40,7 @@ struct DailyPlannerView: View {
                 header
                 HStack(alignment: .top, spacing: 22) {
                     VStack(alignment: .leading, spacing: 18) {
+                        ProjectDayStrip(store: store, day: day)
                         if !points.isEmpty { dayPoints }
                         HStack {
                             Text("把今天，分成能完成的小段。 ").font(.system(size: 14, weight: .medium))
@@ -88,7 +89,7 @@ struct DailyPlannerView: View {
                         }
                     }.frame(maxWidth: .infinity)
                     VStack(alignment: .leading, spacing: 16) {
-                        FocusPane(blocks: blocks, day: day, selectedBlock: $selectedBlock)
+                        FocusPane(store: store, blocks: blocks, day: day, selectedBlock: $selectedBlock)
                         VStack(alignment: .leading, spacing: 10) {
                             Text("有安排，也有余地。").font(.system(size: 12, weight: .medium))
                             Text("已排 \(ClockText.duration(blocks.reduce(0) { $0 + $1.duration }))\n其中休息 \(ClockText.duration(blocks.filter(\.isRest).reduce(0) { $0 + $1.duration }))\n完成 \(blocks.filter(\.completed).count) / \(blocks.count) 个时间块")

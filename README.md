@@ -1,12 +1,12 @@
 # 我Due！ · WoDue
 
-**DDL 别丢，生活照过。** · Public preview 0.3.0
+**DDL 别丢，生活照过。** · Public preview 0.4.0
 
 A quiet macOS desktop planner that gets louder as deadlines approach.
 
 ![WoDue concept illustration with fictional tasks](docs/preview.svg)
 
-[下载 macOS 版（Apple Silicon）](https://github.com/Amalia6767/wodue/releases/tag/v0.3.0) · [中文使用说明](docs/使用说明.md) · [Privacy](docs/PRIVACY.md) · [MIT License](LICENSE)
+[下载 macOS 版（Apple Silicon）](https://github.com/Amalia6767/wodue/releases/tag/v0.4.0) · [功能总览](docs/功能总览.md) · [中文使用说明](docs/使用说明.md) · [Privacy](docs/PRIVACY.md) · [MIT License](LICENSE)
 
 我Due！为课程作业、邮件通知、Presentation 和个人活动交织的生活而做：把未来节点落实为今天的时间安排，再用专注与休息一段段推进。
 
@@ -16,8 +16,10 @@ A quiet macOS desktop planner that gets louder as deadlines approach.
 
 | Feature | Behavior |
 | --- | --- |
-| Quiet desktop note | Transparent at rest; readable text, hover controls, pinning and inline add. Completed text stays visible with a strikethrough. |
+| Quiet desktop note | Transparent at rest; readable text, hover controls, pinning, inline add and compact project progress. Unfinished items come first; completed text stays visible with a strikethrough. |
 | Daily rhythm | Time blocks with start/end times, linked preparation, overlap warnings and space for breaks. |
+| Ongoing projects | Custom goals and target dates, recurring daily effort, weekday rules, date-specific exceptions and total-time previews. Project-linked focus accumulates actual active time; optional outcomes and multiple milestones stay separate. |
+| Project reminders | A persistent countdown and configurable daily reminders from the project start, or a chosen lead time. The nearest three reminders are queued and replenished while running or on reopening. |
 | Long-term plans | Submission deadlines, presentations, workshops, exhibitions and multi-day travel; editable categories and colors. |
 | Deadline radar | Highlights the next 72 hours, then escalates on the day, in the last two hours, in the last 30 minutes and when overdue. Date-only items stay date-only. |
 | Desktop reminders | Grouped cards, acknowledgment, 30-minute snooze and completion. A snooze never hides an exact deadline past its cutoff. |
@@ -28,7 +30,7 @@ A quiet macOS desktop planner that gets louder as deadlines approach.
 | Deadline updates | Canvas publication time decides which notification wins, including when a newer notice moves a deadline earlier. |
 | Local data | JSON persistence, import/export, and separate focus/reminder state. No app-owned cloud service. |
 
-Completing a preparation block does **not** mark its assignment submitted. You decide when the underlying deadline is complete.
+Completing a preparation block does **not** mark its assignment submitted. You decide when the underlying deadline is complete. Reaching an effort estimate does not automatically finish a project or count as an outcome. Pauses, breaks and offline time are excluded from new focus records; active time is allocated across calendar days.
 
 ## Build and run
 
@@ -80,7 +82,7 @@ Normal data lives in:
 ~/Library/Application Support/io.github.amalia6767.wodue/
 ```
 
-`tasks.json` stores plans/categories/blocks; `focus.json` stores focus state; `deadline-reminders.json` stores deadline acknowledgments and snoozes; `event-reminders.json` stores meeting acknowledgments and snoozes. Paste drafts are also local. Back up this directory to preserve everything. JSON plan exports contain tasks, categories and blocks, but not the separate focus/reminder files.
+`tasks.json` stores tasks/projects/categories/blocks (schema 4); `focus-v2.json` stores project-aware focus state and history, with the original `focus.json` retained during migration; `deadline-reminders.json` stores deadline acknowledgments and snoozes; `event-reminders.json` stores meeting acknowledgments and snoozes. Paste drafts are also local. Back up this directory to preserve everything. JSON plan exports contain tasks, projects, categories and blocks, but not the separate focus/reminder files.
 
 This public source tree contains fictional examples only. Personal calendars, task exports, imported text, meeting links and local build artifacts are excluded. See [PRIVACY.md](docs/PRIVACY.md) before sharing logs or screenshots.
 
