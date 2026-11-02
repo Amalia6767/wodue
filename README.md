@@ -1,18 +1,36 @@
 # 我Due！ · WoDue
 
-**DDL 别丢，生活照过。** · Public preview 0.4.0
+![我Due！品牌字标：会说话的 u 与珊瑚水滴感叹号](docs/brand-header.svg)
 
-A quiet macOS desktop planner that gets louder as deadlines approach.
+**给每一天，留一点余地。** A quiet macOS desktop planner that gets louder as deadlines approach.
 
-![WoDue concept illustration with fictional tasks](docs/preview.svg)
-
-[下载 macOS 版（Apple Silicon）](https://github.com/Amalia6767/wodue/releases/tag/v0.4.0) · [功能总览](docs/功能总览.md) · [中文使用说明](docs/使用说明.md) · [Privacy](docs/PRIVACY.md) · [MIT License](LICENSE)
+[下载已发布版 v0.4.0（Apple Silicon）](https://github.com/Amalia6767/wodue/releases/tag/v0.4.0) · [构建最新源码](#build-and-run) · [功能总览](docs/功能总览.md) · [中文使用说明](docs/使用说明.md) · [MIT License](LICENSE)
 
 **主分支源码已更新今日工作台、u 杯和可区分重叠事件的动线。** 上方安装包仍为 v0.4.0；体验最新界面请按下方步骤从源码构建。更新记录见 [Changelog](CHANGELOG.md)。
 
 我Due！为课程作业、邮件通知、Presentation 和个人活动交织的生活而做：把未来节点落实为今天的时间安排，再用专注与休息一段段推进。
 
 平时，桌面便签几乎没有底色；鼠标移入，底板和操作浮现。临近截止时，提醒逐级变明显；会议和活动提前 15 分钟提醒，卡片里可直接打开已保存的链接。
+
+## 新版工作台
+
+![新版今日节奏工作台：专注控制、u杯、重叠事件动线、清单、节点与长期项目](docs/preview.svg)
+
+*当前主分支的界面示意，全部日程为虚构数据；不是实际截图。旧版安装包与主分支的界面有差异。*
+
+- **从今天开始推进**：当前事项、专注与休息、近期节点和项目进展放在同一个工作台。
+- **看见已经做过的事**：u 杯呈现当日计划完成进度，长期项目另行累计实际专注投入。
+- **重叠也能看清**：不同事件使用独立紫灰色阶与内嵌边界；悬停查看时间、时长、状态和完整标题。未完成在前，完成后仍保留划线内容。
+
+![动线细节示意：重叠时间段保持独立轮廓，上方深色卡片显示事项信息](docs/ribbon-detail.svg)
+
+## Logo 与品牌
+
+![我Due！Logo、应用标志及紫墨珊瑚暖底配色](docs/brand.svg)
+
+u 既是字母，也是正在发音的嘴；上方的珊瑚水滴延续了感叹号的形态。应用使用紫墨 `#332D3D`、珊瑚 `#CA5140` 与暖底 `#F8F5F0`。
+
+[字标 SVG](Resources/Brand/WoDueWordmark.svg) · [独立标志 SVG](Resources/Brand/WoDueSymbol.svg) · [透明字标 PNG](Resources/Brand/WoDueWordmarkTrim.png) · [透明标志 PNG](Resources/Brand/WoDueSymbol.png) · [macOS 图标 ICNS](Resources/Brand/AppIcon.icns)
 
 ## What it does
 
