@@ -4,9 +4,9 @@
 
 **给每一天，留一点余地。** A quiet macOS desktop planner that gets louder as deadlines approach.
 
-[下载已发布版 v0.4.0（Apple Silicon）](https://github.com/Amalia6767/wodue/releases/tag/v0.4.0) · [构建最新源码](#build-and-run) · [功能总览](docs/功能总览.md) · [中文使用说明](docs/使用说明.md) · [MIT License](LICENSE)
+[下载 v0.5.0（Apple Silicon）](https://github.com/Amalia6767/wodue/releases/download/v0.5.0/wodue-macos-arm64.zip) · [版本说明与校验文件](https://github.com/Amalia6767/wodue/releases/tag/v0.5.0) · [从源码构建](#build-and-run) · [功能总览](docs/功能总览.md) · [中文使用说明](docs/使用说明.md) · [MIT License](LICENSE)
 
-**主分支源码已更新今日工作台、u 杯和可区分重叠事件的动线。** 上方安装包仍为 v0.4.0；体验最新界面请按下方步骤从源码构建。更新记录见 [Changelog](CHANGELOG.md)。
+**v0.5.0 包含新版今日工作台、u 杯、嘴形 u Logo 和可区分重叠事件的动线。** 下载解压后，将「我Due！.app」放入 Applications。适用于 Apple Silicon Mac、macOS 14 及以上；此公开预览版尚未 Apple 公证。更新记录见 [Changelog](CHANGELOG.md)。
 
 我Due！为课程作业、邮件通知、Presentation 和个人活动交织的生活而做：把未来节点落实为今天的时间安排，再用专注与休息一段段推进。
 
@@ -16,7 +16,7 @@
 
 ![新版今日节奏工作台：专注控制、u杯、重叠事件动线、清单、节点与长期项目](docs/preview.svg)
 
-*当前主分支的界面示意，全部日程为虚构数据；不是实际截图。旧版安装包与主分支的界面有差异。*
+*v0.5.0 工作台界面示意，全部日程为虚构数据；不是实际截图。*
 
 - **从今天开始推进**：当前事项、专注与休息、近期节点和项目进展放在同一个工作台。
 - **看见已经做过的事**：u 杯呈现当日计划完成进度，长期项目另行累计实际专注投入。

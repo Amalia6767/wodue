@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — 2026-11-02
+## 0.5.0 — 2026-11-02
 
 - Refresh the speaking-u wordmark, app icon and purple-ink/coral interface, with frosted cards and grouped navigation.
 - Rebuild the daily workbench around the selected activity, focus controls, a daily u-cup, a single-row day ribbon, upcoming milestones and project progress.
