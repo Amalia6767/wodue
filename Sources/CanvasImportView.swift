@@ -42,7 +42,7 @@ struct CanvasImportView: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("作业变了，清单也跟着更新。")
-                        .font(.system(size: 24, weight: .medium, design: .serif))
+                        .font(.system(size: 24, weight: .semibold, design: .rounded))
                     Text("粘贴 Canvas 作业、公告或通知；同一份作业按最新通知合并，保留完成状态。")
                         .font(.system(size: 11)).foregroundColor(Palette.secondary)
                 }
@@ -59,7 +59,7 @@ struct CanvasImportView: View {
                     }
                     TextEditor(text: $source).font(.system(size: 11))
                         .scrollContentBackground(.hidden).padding(10)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 10))
+                        .background(Palette.card, in: RoundedRectangle(cornerRadius: 10))
                         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Palette.line))
                         .accessibilityLabel("Canvas 待识别内容")
                     HStack {
@@ -85,14 +85,14 @@ struct CanvasImportView: View {
                         }
                     } else {
                         VStack(spacing: 14) {
-                            Image(systemName: "tray.and.arrow.down").font(.system(size: 28)).foregroundColor(Palette.pink.opacity(0.6))
+                            Image(systemName: "tray.and.arrow.down").font(.system(size: 28)).foregroundColor(Palette.accent.opacity(0.6))
                             Text(parsed ? "没有识别到作业。可复制作业标题、链接和 Due 一行后再试。" : "可一次粘贴整页作业或多条通知。")
                                 .font(.system(size: 12)).multilineTextAlignment(.center)
                             Text("发布时间用于比较先后，Due 才是截止时间。")
                                 .font(.system(size: 10)).foregroundColor(Palette.secondary)
                         }.frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
-                    if source != parsedSource && parsed { Text("原文已更改，请重新识别。").font(.system(size: 10)).foregroundColor(Palette.pink) }
+                    if source != parsedSource && parsed { Text("原文已更改，请重新识别。").font(.system(size: 10)).foregroundColor(Palette.accent) }
                 }.frame(maxWidth: .infinity)
             }
             HStack {
@@ -105,10 +105,10 @@ struct CanvasImportView: View {
                 Button("关闭", action: onClose).keyboardShortcut(.cancelAction)
                 Button("导出日历…", action: exportCalendar).disabled(chosen.isEmpty)
                 Button("加入 / 更新 \(chosen.count) 项", action: add)
-                    .buttonStyle(.borderedProminent).tint(Palette.pink).disabled(chosen.isEmpty)
+                    .buttonStyle(PrimaryActionStyle()).disabled(chosen.isEmpty)
             }
         }.padding(26).frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Palette.paper).foregroundColor(Palette.ink).tint(Palette.pink)
+            .background(Palette.paper).foregroundColor(Palette.ink).tint(Palette.accent)
             .onAppear { if !source.isEmpty { parse() } }
             .onChange(of: source) { _, text in
                 try? String(text.prefix(100_000)).write(to: draftURL, atomically: true, encoding: .utf8)
@@ -130,7 +130,7 @@ struct CanvasImportView: View {
                         .textFieldStyle(.plain).font(.system(size: 12, weight: .medium)).lineLimit(2...4)
                     HStack(spacing: 6) {
                         Text(item.informational ? "信息通知" : disposition.rawValue)
-                            .foregroundColor(blocked ? Palette.pink : Palette.green)
+                            .foregroundColor(blocked ? Palette.accent : Palette.green)
                         if item.mergedCount > 1 { Text("合并 \(item.mergedCount) 条").foregroundColor(Palette.secondary) }
                         Spacer()
                         if let url = WebLink.safe(item.link) { Link("原文 ↗", destination: url) }
@@ -168,7 +168,7 @@ struct CanvasImportView: View {
             }
             if [.unknownOrder, .conflict].contains(disposition) {
                 Label("与清单已有通知无法排定先后，保留原任务。", systemImage: "info.circle")
-                    .font(.system(size: 10)).foregroundColor(Palette.pink)
+                    .font(.system(size: 10)).foregroundColor(Palette.accent)
             }
             ForEach(Array(item.warnings.enumerated()), id: \.offset) { _, warning in
                 Text(warning).font(.system(size: 10)).foregroundColor(Palette.secondary)
@@ -182,7 +182,7 @@ struct CanvasImportView: View {
                 Text(item.original).font(.system(size: 10)).textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 5)
             }.font(.system(size: 10)).foregroundColor(Palette.secondary)
-        }.padding(14).background(.white.opacity(0.85), in: RoundedRectangle(cornerRadius: 10))
+        }.padding(14).background(Palette.card.opacity(0.85), in: RoundedRectangle(cornerRadius: 10))
     }
     private var subscriptionHelp: some View {
         VStack(alignment: .leading, spacing: 14) {

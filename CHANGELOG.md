@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — 2026-11-02
+
+- Refresh the speaking-u wordmark, app icon and purple-ink/coral interface, with frosted cards and grouped navigation.
+- Rebuild the daily workbench around the selected activity, focus controls, a daily u-cup, a single-row day ribbon, upcoming milestones and project progress.
+- Give overlapping events distinct opaque tones and inset outlines so each event remains visible, including events with identical time ranges.
+- Show start/end times, duration, status and a wrapping title in a dark card above the ribbon; keep edge tooltips within the track.
+- Put unfinished daily blocks first while keeping completed content visible and restoring chronological order when unchecked.
+- Correct overdue-task guidance for ongoing and expired preparation slots, and avoid promising system reminders when notifications are disabled.
+- Add reminder-boundary and ribbon-layout regression checks; 258 isolated checks pass.
+
 ## 0.2.0 — 2026-10-27
 
 - Timed meetings and activities now remind 15 minutes before their start and again at the start.

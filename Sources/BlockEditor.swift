@@ -70,7 +70,7 @@ struct BlockEditor: View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("这段时间，只做这件事。")
-                    .font(.system(size: 23, weight: .medium, design: .serif))
+                    .font(.system(size: 23, weight: .semibold, design: .rounded))
                 Text("安排工作、起床、活动或休息。工作时段与原来的截止节点分开保存。")
                     .font(.system(size: 10)).foregroundColor(Palette.secondary)
             }
@@ -100,7 +100,7 @@ struct BlockEditor: View {
                     Toggle("到当天 24:00 结束", isOn: $midnight).toggleStyle(.checkbox)
                     HStack {
                         Text(block.duration > 0 ? "\(ClockText.duration(block.duration)) · 有开始，也有收尾" : "结束时间需晚于开始时间")
-                            .foregroundColor(block.duration > 0 ? Palette.secondary : Palette.pink)
+                            .foregroundColor(block.duration > 0 ? Palette.secondary : Palette.accent)
                         Spacer()
                         Button("找下个空档", action: findSlot)
                     }
@@ -122,13 +122,13 @@ struct BlockEditor: View {
                     }
                     if !conflicts.isEmpty {
                         VStack(alignment: .leading, spacing: 5) {
-                            Label("与已有安排重叠", systemImage: "rectangle.on.rectangle").foregroundColor(Palette.pink)
+                            Label("与已有安排重叠", systemImage: "rectangle.on.rectangle").foregroundColor(Palette.accent)
                             ForEach(Array(conflicts.prefix(4).enumerated()), id: \.offset) { _, overlap in
                                 Text("\(ClockText.minute(overlap.start))–\(ClockText.minute(overlap.end))  \(overlap.title)")
                             }
-                        }.padding(12).frame(maxWidth: .infinity, alignment: .leading).background(Palette.blush.opacity(0.6), in: RoundedRectangle(cornerRadius: 8))
+                        }.padding(12).frame(maxWidth: .infinity, alignment: .leading).background(Palette.selection.opacity(0.6), in: RoundedRectangle(cornerRadius: 8))
                     }
-                    if !slotMessage.isEmpty { Text(slotMessage).foregroundColor(Palette.pink) }
+                    if !slotMessage.isEmpty { Text(slotMessage).foregroundColor(Palette.accent) }
                     TextField("这段时间想完成到什么程度？（可选）", text: $notes, axis: .vertical).lineLimit(2...4).textFieldStyle(.roundedBorder)
                 }.font(.system(size: 11)).padding(.trailing, 5).environment(\.locale, Locale(identifier: "zh_CN"))
             }
@@ -138,9 +138,9 @@ struct BlockEditor: View {
                 Button("取消") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button(conflicts.isEmpty ? "保存时间块" : "保存（有重叠）") {
                     if store.upsertBlock(block) { FocusClock.shared.updateBlock(block); dismiss() }
-                }.buttonStyle(.borderedProminent).tint(Palette.pink).disabled(!valid)
+                }.buttonStyle(PrimaryActionStyle()).disabled(!valid)
             }
-        }.padding(26).frame(width: 560, height: 650).background(Palette.paper).foregroundColor(Palette.ink).tint(Palette.pink)
+        }.padding(26).frame(width: 560, height: 650).background(Palette.paper).foregroundColor(Palette.ink).tint(Palette.accent)
             .sheet(isPresented: $categories) { CategoryManagerView(store: store) }
             .onChange(of: categoryID) { _, value in if value == "rest" { rest = true } }
             .onChange(of: store.categories) { _, _ in if store.category(categoryID) == nil { categoryID = "" } }

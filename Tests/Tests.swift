@@ -258,6 +258,34 @@ struct ModelTests {
         let busy = PlanningEngine.busy(on: work.day, tasks: [], blocks: [work, hardware])
         check(PlanningEngine.freeSlot(duration: 60, after: 615, busy: busy) == 720..<780, "Free-slot suggestions skip occupied time and use a real gap")
         check(PlanningEngine.freeSlot(duration: 240, after: 1080, busy: busy) == nil, "No suggestion silently extends a work block past the selected planning boundary")
+        let ribbonLong = RibbonLayout.Segment(id: UUID(), start: 600, end: 1320)
+        let ribbonShort = RibbonLayout.Segment(id: UUID(), start: 660, end: 840)
+        let ribbonInner = RibbonLayout.Segment(id: UUID(), start: 660, end: 780)
+        let ribbonInput = [ribbonInner, ribbonLong, ribbonShort]
+        let ribbonStyles = RibbonLayout.styles(ribbonInput)
+        check(Set(ribbonStyles.values.map(\.tone)).count == 3, "Simultaneous events receive different opaque tones instead of merging into one live color")
+        check(Set(ribbonStyles.values.map(\.level)).count == 3 && ribbonStyles[ribbonLong.id]?.level == 0, "Nested events preserve visible outer rims with separate inset levels")
+        check(RibbonLayout.styles(Array(ribbonInput.reversed())) == ribbonStyles, "Event appearance is stable when the input list is reordered")
+        let ribbonTouching = [RibbonLayout.Segment(id: UUID(), start: 600, end: 660), RibbonLayout.Segment(id: UUID(), start: 660, end: 720)]
+        check(RibbonLayout.styles(ribbonTouching).values.allSatisfy { $0.level == 0 }, "Adjacent events remain full height and are not treated as overlaps")
+        let ribbonSame = (0..<8).map { _ in RibbonLayout.Segment(id: UUID(), start: 600, end: 720) }
+        let sameStyles = RibbonLayout.styles(ribbonSame)
+        check(Set(sameStyles.values.map(\.level)).count == 8, "Identical time ranges retain separate visible nesting levels even after all six tones have been used")
+        check(RibbonLayout.styles([]).isEmpty, "An empty ribbon needs no generated event appearance")
+        let linkedID = UUID()
+        let elapsedPlan = TimeBlock(title: "旧时段", day: work.day, startMinute: 540, endMinute: 600, taskID: linkedID)
+        let ongoingPlan = TimeBlock(title: "当前时段", day: work.day, startMinute: 660, endMinute: 720, taskID: linkedID)
+        let futurePlan = TimeBlock(title: "下一段", day: work.day, startMinute: 780, endMinute: 840, taskID: linkedID)
+        let reminderPlans = [futurePlan, elapsedPlan, ongoingPlan]
+        check(PlanningEngine.pendingBlock(taskID: linkedID, on: work.day, at: 600, blocks: [elapsedPlan]) == nil, "At the exact end of a slot, an expired plan is not promised as a future reminder")
+        check(PlanningEngine.pendingBlock(taskID: linkedID, on: work.day, at: 660, blocks: reminderPlans)?.id == ongoingPlan.id, "At the start boundary, the current linked slot takes precedence over a future one")
+        check(PlanningEngine.pendingBlock(taskID: linkedID, on: work.day, at: 700, blocks: reminderPlans)?.id == ongoingPlan.id, "An ongoing slot is still available to the workbench reminder")
+        check(PlanningEngine.pendingBlock(taskID: linkedID, on: work.day, at: 720, blocks: reminderPlans)?.id == futurePlan.id, "After a slot ends, the reminder advances to the next linked plan")
+        var donePlan = ongoingPlan; donePlan.completed = true
+        var restPlan = ongoingPlan; restPlan.rest = true
+        var otherDay = ongoingPlan; otherDay.day = Day.adding(1, to: work.day)
+        var otherTask = ongoingPlan; otherTask.taskID = UUID()
+        check(PlanningEngine.pendingBlock(taskID: linkedID, on: work.day, at: 700, blocks: [donePlan, restPlan, otherDay, otherTask]) == nil, "Completed slots, rest, another day and another task cannot suppress an overdue reminder")
         var todayDeadline = goal; todayDeadline.id = UUID(); todayDeadline.day = "2026-10-26"; todayDeadline.startMinute = nil; todayDeadline.importance = 1
         var overdueDeadline = goal; overdueDeadline.id = UUID(); overdueDeadline.day = "2026-10-25"
         var completedGoal = goal; completedGoal.id = UUID(); completedGoal.completed = true

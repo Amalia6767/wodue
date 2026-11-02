@@ -7,17 +7,6 @@ import UniformTypeIdentifiers
 // SDKs that expose an optional SwiftUI State macro plugin.
 private typealias ViewState<Value> = SwiftUI.State<Value>
 
-enum Palette {
-    static let paper = Color(hex: 0xFAF8F4)
-    static let sidebar = Color(hex: 0xF1EDE6)
-    static let ink = Color(hex: 0x393832)
-    static let secondary = Color(hex: 0x858178)
-    static let line = Color(hex: 0xE8E3DA)
-    static let pink = Color(hex: 0xB35E70)
-    static let blush = Color(hex: 0xF3E2E3)
-    static let green = Color(hex: 0x7E8C6D)
-}
-
 extension Color {
     init(hex: UInt32) {
         self.init(.sRGB, red: Double((hex >> 16) & 255) / 255,
@@ -98,11 +87,19 @@ private enum Scope: String, CaseIterable {
     case all = "全部事项"
     var icon: String {
         switch self {
-        case .plan: return "square.grid.2x2"
-        case .today: return "sun.max"
-        case .projects: return "leaf"
-        case .horizon: return "calendar.badge.clock"
-        case .all: return "tray.full"
+        case .plan: return "rectangle.split.3x1"
+        case .today: return "sunrise"
+        case .projects: return "flag"
+        case .horizon: return "hourglass"
+        case .all: return "tray"
+        }
+    }
+    var group: String? {
+        switch self {
+        case .today: return "今天"
+        case .projects: return "规划"
+        case .all: return "整理"
+        default: return nil
         }
     }
 }
@@ -146,16 +143,16 @@ struct ContentView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            ScrollView { sidebar }.frame(width: 222).background(Palette.sidebar)
-            Rectangle().fill(Palette.line).frame(width: 1)
+            ScrollView { sidebar }.quietScroll().frame(width: 240)
+                .background { Rectangle().fill(.ultraThinMaterial).overlay(Color(hex: 0xF6F3F4).opacity(0.55)) }
+            Rectangle().fill(Palette.ink(0.07)).frame(width: 1)
             VStack(alignment: .leading, spacing: 0) {
-                topbar
                 DeadlineBanner(store: store, onEdit: { editor = EditorItem(task: $0, day: $0.day) })
                 EventBanner()
                 if scope == .projects && selectedDay == nil {
                     ProjectsView(store: store)
                 } else if scope == .today {
-                    DailyPlannerView(store: store, day: selectedDay ?? Day.today, onDay: { selectedDay = $0; calendarMonth = Day.date($0)! }, onEdit: { editor = EditorItem(task: $0, day: $0.day) }, onAddTask: { editor = EditorItem(day: selectedDay ?? Day.today) })
+                    DailyPlannerView(store: store, day: selectedDay ?? Day.today, onDay: { selectedDay = $0; calendarMonth = Day.date($0)! }, onEdit: { editor = EditorItem(task: $0, day: $0.day) }, onAddTask: { editor = EditorItem(day: selectedDay ?? Day.today) }, onOpenHorizon: { scope = .horizon; selectedDay = nil })
                 } else if scope == .horizon && selectedDay == nil {
                     HorizonView(store: store, onEdit: { editor = EditorItem(task: $0, day: $0.day) }, onAdd: { editor = EditorItem(day: Day.today) })
                 } else {
@@ -186,13 +183,13 @@ struct ContentView: View {
                     }
                     .padding(.horizontal, 34).padding(.top, 28).padding(.bottom, 28)
                 }
-                .background(Palette.paper)
+                .quietScroll()
                 }
             }
         }
         .foregroundColor(Palette.ink)
-        .background(Palette.paper)
-        .tint(Palette.pink)
+        .background(AmbientBackground())
+        .tint(Palette.accent)
         .onAppear {
             FocusClock.shared.configure(store: store)
             CalendarSyncManager.shared.configure(store: store)
@@ -243,7 +240,7 @@ struct ContentView: View {
                         store.restore(deleted)
                         self.deleted = nil
                         undoDismiss?.cancel()
-                    }.fontWeight(.semibold).foregroundColor(Palette.blush)
+                    }.fontWeight(.semibold).foregroundColor(Palette.selection)
                     Button { self.deleted = nil } label: { Image(systemName: "xmark") }
                         .foregroundColor(.white.opacity(0.6)).help("关闭提示")
                 }
@@ -254,7 +251,7 @@ struct ContentView: View {
             } else if let toast = store.toast {
                 Label(toast, systemImage: "checkmark.circle.fill")
                     .font(.system(size: 12)).padding(14)
-                    .background(.white, in: Capsule()).shadow(color: .black.opacity(0.08), radius: 8)
+                    .background(Palette.card, in: Capsule()).shadow(color: .black.opacity(0.08), radius: 8)
                     .padding(.bottom, 24)
             }
         }
@@ -270,56 +267,22 @@ struct ContentView: View {
 
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 11).fill(Palette.pink).frame(width: 36, height: 36)
-                    Image(systemName: "checkmark").font(.system(size: 18, weight: .medium)).foregroundColor(.white)
-                }
-                Text("我Due！").font(.system(size: 20, weight: .semibold, design: .rounded))
-            }.padding(.top, 43)
+            BrandWordmark().frame(width: 102, height: 34, alignment: .leading)
+                .padding(.top, 42)
             Text("给每一天，留一点余地。")
-                .font(.system(size: 11)).foregroundColor(Palette.secondary).padding(.top, 12)
+                .font(.system(size: 11)).foregroundColor(Palette.secondary).padding(.top, 10)
 
-            VStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 2) {
                 ForEach(Scope.allCases, id: \.self) { item in
-                    Button {
-                        scope = item; selectedDay = nil; search = ""
-                        if item == .today { calendarMonth = Day.date(Day.today)! }
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: item.icon).font(.system(size: 14)).frame(width: 18)
-                            Text(item.rawValue).font(.system(size: 13, weight: scope == item && selectedDay == nil ? .semibold : .regular))
-                            Spacer()
-                            if item == .today {
-                                Text("\(store.tasks(on: Day.today).filter { !$0.completed }.count + store.blocks(on: Day.today).filter { !$0.completed }.count)")
-                                    .font(.system(size: 10, weight: .medium)).padding(.horizontal, 6).padding(.vertical, 2)
-                                    .background(.white.opacity(0.65), in: Capsule())
-                            }
-                        }
-                        .padding(.horizontal, 12).frame(height: 41)
-                        .foregroundColor(scope == item && selectedDay == nil ? Palette.pink : Palette.secondary)
-                        .background(scope == item && selectedDay == nil ? Palette.blush : .clear, in: RoundedRectangle(cornerRadius: 9))
-                        .contentShape(Rectangle())
-                    }.buttonStyle(.plain)
+                    if let group = item.group {
+                        Text(group).font(.system(size: 11)).tracking(1).foregroundColor(Palette.secondary)
+                            .padding(.horizontal, 10).padding(.top, item == .today ? 0 : 14).padding(.bottom, 6)
+                    }
+                    navButton(item)
                 }
-            }.padding(.top, 37)
+            }.padding(.top, 26).padding(.horizontal, -6)
 
-            Rectangle().fill(Palette.line).frame(height: 1).padding(.vertical, 28)
-            calendar
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("今天的小进度").font(.system(size: 11))
-                    Spacer()
-                    Text("\(todayDone) / \(todayTotal)")
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
-                }
-                GeometryReader { proxy in
-                    Capsule().fill(Palette.line)
-                    Capsule().fill(Palette.green).frame(width: proxy.size.width * todayProgress)
-                }.frame(height: 4)
-                Text(todayDone > 0 ? "每一件完成，都算数。" : "从一件小事开始吧。")
-                    .font(.system(size: 10)).foregroundColor(Palette.secondary)
-            }.padding(16).background(Palette.paper, in: RoundedRectangle(cornerRadius: 12)).padding(.top, 32)
+            calendar.padding(.top, 30)
 
             Spacer(minLength: 24)
             HStack(spacing: 17) {
@@ -337,7 +300,7 @@ struct ContentView: View {
                     Spacer()
                     Image(systemName: "arrow.up.right").font(.system(size: 9))
                 }
-                .font(.system(size: 11)).foregroundColor(Palette.pink)
+                .font(.system(size: 11)).foregroundColor(Palette.accent)
                 .padding(.vertical, 12)
             }.buttonStyle(.plain).help("显示半透明的今日便签 ⌥⌘M")
             Menu {
@@ -358,14 +321,30 @@ struct ContentView: View {
         }
         .padding(.horizontal, 22)
         .frame(maxHeight: .infinity)
-        .background(Palette.sidebar)
     }
 
-    private var todayDone: Int { store.tasks(on: Day.today).filter(\.completed).count + store.blocks(on: Day.today).filter(\.completed).count }
-    private var todayTotal: Int { store.tasks(on: Day.today).count + store.blocks(on: Day.today).count }
-    private var todayProgress: CGFloat {
-        let count = todayTotal
-        return count == 0 ? 0 : CGFloat(todayDone) / CGFloat(count)
+    private func navButton(_ item: Scope) -> some View {
+        let badge: (text: String, alert: Bool)? = {
+            switch item {
+            case .today:
+                let open = store.tasks(on: Day.today).filter { !$0.completed }.count + store.blocks(on: Day.today).filter { !$0.completed }.count
+                return open > 0 ? ("\(open)", false) : nil
+            case .projects:
+                let active = store.projects.filter { !$0.completed }.count
+                return active > 0 ? ("\(active)", false) : nil
+            case .horizon:
+                let overdue = store.tasks.filter(Workbench.isOverdue).count
+                if overdue > 0 { return ("\(overdue) 逾期", true) }
+                let soon = store.tasks.filter { !$0.completed && $0.resolvedKind == .deadline && $0.day >= Day.today && $0.day <= Day.adding(3, to: Day.today) }.count
+                return soon > 0 ? ("\(soon)", false) : nil
+            default: return nil
+            }
+        }()
+        return SidebarNavRow(icon: item.icon, title: item.rawValue, badge: badge?.text, alert: badge?.alert ?? false,
+                             selected: scope == item && selectedDay == nil) {
+            scope = item; selectedDay = nil; search = ""
+            if item == .today { calendarMonth = Day.date(Day.today)! }
+        }
     }
 
     private var calendar: some View {
@@ -395,12 +374,12 @@ struct ContentView: View {
                             VStack(spacing: 2) {
                                 Text("\(Day.calendar.component(.day, from: date))")
                                     .font(.system(size: 10, weight: today ? .semibold : .regular))
-                                Circle().fill(store.tasks(on: key).isEmpty ? .clear : (today ? .white : Palette.pink))
+                                Circle().fill(store.tasks(on: key).isEmpty ? .clear : (today ? .white : Palette.coral))
                                     .frame(width: 3, height: 3)
                             }
                             .frame(maxWidth: .infinity).frame(height: 26)
-                            .foregroundColor(today ? .white : (inRange ? Palette.pink : Palette.secondary))
-                            .background(today ? Palette.pink : (inRange ? Palette.blush : .clear), in: RoundedRectangle(cornerRadius: 6))
+                            .foregroundColor(today ? .white : (inRange ? Palette.accent : Palette.secondary))
+                            .background(today ? Palette.accent : (inRange ? Palette.selection : .clear), in: RoundedRectangle(cornerRadius: 6))
                             .contentShape(Rectangle())
                         }.buttonStyle(.plain).accessibilityLabel(Day.formatted(key, "M月d日，EEEE"))
                     } else { Color.clear.frame(height: 26) }
@@ -441,9 +420,9 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 11) {
                 Text("DAY BY DAY  /  \(Day.formatted(visibleDays.first ?? Day.today, "yyyy.MM"))")
                     .font(.system(size: 10, weight: .medium, design: .monospaced)).tracking(2)
-                    .foregroundColor(Palette.pink)
+                    .foregroundColor(Palette.accent)
                 Text(scope == .today && selectedDay == nil ? "今天，也慢慢来。" : "居家的几天，慢慢来。")
-                    .font(.system(size: 29, weight: .medium, design: .serif)).tracking(1)
+                    .font(.system(size: 29, weight: .semibold, design: .rounded)).tracking(1)
                 Text("把事情放进日子里，做完一件就轻轻划掉。")
                     .font(.system(size: 12)).foregroundColor(Palette.secondary)
             }
@@ -475,7 +454,7 @@ struct ContentView: View {
             }
             if selectedDay != nil || (scope == .plan && anchor != Day.today) {
                 Button("回到计划") { selectedDay = nil; scope = .plan; anchor = Day.today; search = "" }
-                    .buttonStyle(.plain).font(.system(size: 10)).foregroundColor(Palette.pink)
+                    .buttonStyle(.plain).font(.system(size: 10)).foregroundColor(Palette.accent)
             }
             Spacer(minLength: 4)
             HStack(spacing: 5) {
@@ -487,14 +466,14 @@ struct ContentView: View {
                 }
             }
             .font(.system(size: 10)).padding(.horizontal, 10).frame(width: 112, height: 30)
-            .background(.white.opacity(0.8), in: RoundedRectangle(cornerRadius: 7))
+            .background(Palette.card.opacity(0.8), in: RoundedRectangle(cornerRadius: 7))
             .overlay(RoundedRectangle(cornerRadius: 7).stroke(Palette.line, lineWidth: 1))
             Button {
                 editor = EditorItem(day: selectedDay ?? (scope == .today ? Day.today : anchor))
             } label: {
                 Label("新事项", systemImage: "plus").font(.system(size: 11, weight: .medium))
                     .padding(.horizontal, 13).frame(height: 31)
-                    .foregroundColor(.white).background(Palette.pink, in: RoundedRectangle(cornerRadius: 7))
+                    .foregroundColor(.white).background(Palette.accent, in: RoundedRectangle(cornerRadius: 7))
             }.buttonStyle(.plain).help("添加事项 ⌘N")
         }
     }
@@ -502,7 +481,7 @@ struct ContentView: View {
         VStack(spacing: 12) {
             Image(systemName: "magnifyingglass").font(.system(size: 25)).foregroundColor(Palette.secondary)
             Text("这几个日子里，没有找到「\(search)」").font(.system(size: 13))
-            Button("清除搜索") { search = "" }.buttonStyle(.plain).foregroundColor(Palette.pink)
+            Button("清除搜索") { search = "" }.buttonStyle(.plain).foregroundColor(Palette.accent)
         }.frame(maxWidth: .infinity).padding(.vertical, 80)
     }
     private func matches(_ task: Todo) -> Bool {
@@ -538,8 +517,8 @@ private struct DayCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: 11) {
-                Text(Day.formatted(day, "dd")).font(.system(size: 31, weight: .regular, design: .serif))
-                    .foregroundColor(today ? Palette.pink : Palette.ink)
+                Text(Day.formatted(day, "dd")).font(.system(size: 31, weight: .regular, design: .rounded))
+                    .foregroundColor(today ? Palette.accent : Palette.ink)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(Day.formatted(day, "EEEE")).font(.system(size: 11, weight: .medium))
                     Text(Day.formatted(day, "M 月"))
@@ -547,9 +526,9 @@ private struct DayCard: View {
                 }
                 Spacer()
                 if today {
-                    Text("今天").font(.system(size: 9, weight: .medium)).foregroundColor(Palette.pink)
+                    Text("今天").font(.system(size: 9, weight: .medium)).foregroundColor(Palette.accent)
                         .padding(.horizontal, 9).padding(.vertical, 4)
-                        .background(Palette.blush, in: Capsule())
+                        .background(Palette.selection, in: Capsule())
                 } else if done == tasks.count && !tasks.isEmpty {
                     Image(systemName: "checkmark.seal").foregroundColor(Palette.green).font(.system(size: 17))
                 }
@@ -571,7 +550,7 @@ private struct DayCard: View {
             }.padding(.top, 5)
             if blockCount > 0 {
                 Button("查看 \(blockCount) 个时间块 →", action: onPlanDay)
-                    .buttonStyle(.plain).font(.system(size: 10)).foregroundColor(Palette.pink).padding(.vertical, 10)
+                    .buttonStyle(.plain).font(.system(size: 10)).foregroundColor(Palette.accent).padding(.vertical, 10)
             }
             Spacer(minLength: 12)
             HStack {
@@ -584,10 +563,10 @@ private struct DayCard: View {
             }.padding(.top, 11)
         }
         .padding(22).frame(maxWidth: .infinity, minHeight: 256, alignment: .topLeading)
-        .background(.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 13))
-        .overlay(RoundedRectangle(cornerRadius: 13).stroke(today ? Palette.pink.opacity(0.45) : Palette.line, lineWidth: 1))
+        .background(Palette.card.opacity(0.82), in: RoundedRectangle(cornerRadius: 13))
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(today ? Palette.accent.opacity(0.45) : Palette.line, lineWidth: 1))
         .overlay(alignment: .top) {
-            if today { Capsule().fill(Palette.pink.opacity(0.65)).frame(width: 32, height: 3) }
+            if today { Capsule().fill(Palette.accent.opacity(0.65)).frame(width: 32, height: 3) }
         }
     }
 }
@@ -615,7 +594,7 @@ private struct TaskRow: View {
                             HStack(spacing: 5) {
                                 if task.calendarSource != nil { Image(systemName: "calendar").font(.system(size: 8)) }
                                 Text(time).font(.system(size: 9, weight: .medium, design: .monospaced))
-                            }.foregroundColor(task.completed ? Palette.secondary : Palette.pink)
+                            }.foregroundColor(task.completed ? Palette.secondary : Palette.accent)
                         }
                         Text(task.title).font(.system(size: 12))
                             .foregroundColor(task.completed ? Color(hex: 0x8C877F) : Palette.ink)

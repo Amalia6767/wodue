@@ -180,12 +180,12 @@ private struct DesktopNoteView: View {
     private var editing: Bool { (adding && inputWasChosen) || !newTitle.isEmpty }
     private var engaged: Bool { controller.hovering || editing || showAppearance || menuTracking }
     private var ink: Color {
-        controller.lightText ? .white.opacity(engaged ? 0.98 : 0.91) : Color(hex: 0x24272B).opacity(engaged ? 0.98 : 0.88)
+        controller.lightText ? .white.opacity(engaged ? 0.98 : 0.91) : Color(hex: 0x332D3D).opacity(engaged ? 0.98 : 0.88)
     }
     private var secondary: Color {
-        controller.lightText ? .white.opacity(engaged ? 0.64 : 0.65) : Color(hex: 0x24272B).opacity(engaged ? 0.58 : 0.64)
+        controller.lightText ? .white.opacity(engaged ? 0.64 : 0.65) : Color(hex: 0x332D3D).opacity(engaged ? 0.58 : 0.64)
     }
-    private var surface: Color { controller.lightText ? Color(hex: 0x202329) : Color(hex: 0xFBF9F5) }
+    private var surface: Color { controller.lightText ? Color(hex: 0x282430) : Color(hex: 0xF8F5F0) }
     // One alpha step keeps the whole window hit-testable while visually clear.
     private var plateOpacity: Double { reduceTransparency ? 1 : (engaged ? controller.focusOpacity : max(1.0 / 255, controller.idleOpacity)) }
     private var transition: Animation? { reduceMotion ? nil : .easeInOut(duration: 0.20) }
@@ -333,7 +333,7 @@ private struct DesktopNoteView: View {
 
             VStack(spacing: 10) {
                 if let inputError {
-                    Text(inputError).font(.system(size: 10)).foregroundColor(Palette.pink)
+                    Text(inputError).font(.system(size: 10)).foregroundColor(Palette.accent)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 HStack(spacing: 8) {
@@ -347,13 +347,13 @@ private struct DesktopNoteView: View {
                         Button(action: addTask) {
                             Image(systemName: "arrow.turn.down.left").font(.system(size: 10, weight: .medium))
                                 .frame(width: 24, height: 23).foregroundColor(.white)
-                                .background(Palette.pink, in: RoundedRectangle(cornerRadius: 5))
+                                .background(Palette.accent, in: RoundedRectangle(cornerRadius: 5))
                         }.buttonStyle(.plain).accessibilityLabel("添加到今天的便签")
                     }
                 }
                 .padding(.horizontal, 10).frame(height: 32)
                 .background((controller.lightText ? Color.white : Color.black).opacity(editing ? 0.075 : 0.035), in: RoundedRectangle(cornerRadius: 7))
-                .overlay(RoundedRectangle(cornerRadius: 7).stroke(editing ? Palette.pink.opacity(0.55) : secondary.opacity(0.10), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 7).stroke(editing ? Palette.accent.opacity(0.55) : secondary.opacity(0.10), lineWidth: 1))
                 .opacity(engaged ? 1 : 0)
                 .allowsHitTesting(engaged)
                 HStack {
@@ -399,7 +399,7 @@ private struct DesktopNoteView: View {
                         .font(.system(size: 11, design: .monospaced)).foregroundColor(Palette.secondary)
                 }
                 Slider(value: $controller.idleOpacity, in: 0...0.14)
-                    .tint(Palette.pink).accessibilityLabel("便签静置背景浓度")
+                    .tint(Palette.accent).accessibilityLabel("便签静置背景浓度")
                 HStack {
                     Text("关注时背景").font(.system(size: 11))
                     Spacer()
@@ -407,7 +407,7 @@ private struct DesktopNoteView: View {
                         .font(.system(size: 11, design: .monospaced)).foregroundColor(Palette.secondary)
                 }
                 Slider(value: $controller.focusOpacity, in: 0.86...1)
-                    .tint(Palette.pink).accessibilityLabel("便签关注时背景浓度")
+                    .tint(Palette.accent).accessibilityLabel("便签关注时背景浓度")
                 Text("鼠标移入时显示底板；输入和打开菜单时保持清楚。")
                     .font(.system(size: 10)).foregroundColor(Palette.secondary)
                 Picker("文字颜色", selection: $controller.lightText) {
@@ -417,7 +417,7 @@ private struct DesktopNoteView: View {
                 Text("浅色文字配深色底板，深色文字配浅色底板。")
                     .font(.system(size: 10)).foregroundColor(Palette.secondary)
                 Button("恢复推荐透明度") { controller.idleOpacity = 0; controller.focusOpacity = 0.96 }
-                    .font(.system(size: 10)).tint(Palette.pink)
+                    .font(.system(size: 10)).tint(Palette.accent)
             }.padding(20).frame(width: 260).foregroundColor(Palette.ink).preferredColorScheme(.light)
         }
         .onReceive(clock) { _ in if today != Day.today { today = Day.today } }

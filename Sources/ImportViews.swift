@@ -56,7 +56,7 @@ final class ToolsWindowController {
         window.title = title
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: width, height: height)
-        window.backgroundColor = NSColor(srgbRed: 0.98, green: 0.973, blue: 0.957, alpha: 1)
+        window.backgroundColor = NSColor(Palette.paper)
         return window
     }
 }
@@ -67,7 +67,7 @@ private struct CalendarSettingsView: View {
         VStack(alignment: .leading, spacing: 19) {
             VStack(alignment: .leading, spacing: 9) {
                 Label("日历里的事，也放在这里。", systemImage: "calendar")
-                    .font(.system(size: 22, weight: .medium, design: .serif))
+                    .font(.system(size: 22, weight: .semibold, design: .rounded))
                 Text("同步 Mac 日历里已接入的 Google、iCloud 等账号。")
                     .font(.system(size: 11)).foregroundColor(Palette.secondary)
             }
@@ -76,7 +76,7 @@ private struct CalendarSettingsView: View {
                 Text(manager.status).font(.system(size: 11)).fixedSize(horizontal: false, vertical: true)
                 Spacer()
                 if manager.busy { ProgressView().controlSize(.small) }
-            }.padding(13).background(.white.opacity(0.7), in: RoundedRectangle(cornerRadius: 9))
+            }.padding(13).background(Palette.card.opacity(0.7), in: RoundedRectangle(cornerRadius: 9))
             if manager.hasAccess {
                 Toggle("自动同步到清单和桌面便签", isOn: Binding(get: { manager.enabled }, set: manager.setEnabled))
                     .toggleStyle(.switch).font(.system(size: 12))
@@ -105,13 +105,13 @@ private struct CalendarSettingsView: View {
                             Divider().opacity(0.45)
                         }
                     }
-                }.background(.white.opacity(0.65), in: RoundedRectangle(cornerRadius: 9))
+                }.background(Palette.card.opacity(0.65), in: RoundedRectangle(cornerRadius: 9))
             } else {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("首次连接需要允许系统的日历访问请求。")
                         .font(.system(size: 12))
                     Button(manager.busy ? "等待授权…" : "连接 Mac 日历") { manager.connect() }
-                        .buttonStyle(.borderedProminent).tint(Palette.pink).disabled(manager.busy)
+                        .buttonStyle(PrimaryActionStyle()).disabled(manager.busy)
                     Button("打开系统设置") {
                         if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.systempreferences") {
                             NSWorkspace.shared.open(url)
@@ -131,7 +131,7 @@ private struct CalendarSettingsView: View {
                 }
             }.font(.system(size: 10)).foregroundColor(Palette.secondary)
         }.padding(26).frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Palette.paper).foregroundColor(Palette.ink).tint(Palette.pink)
+            .background(Palette.paper).foregroundColor(Palette.ink).tint(Palette.accent)
     }
 }
 
@@ -176,7 +176,7 @@ private struct PasteImportView: View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 9) {
                 Text("把邮件与通知，轻轻放进清单。")
-                    .font(.system(size: 23, weight: .medium, design: .serif))
+                    .font(.system(size: 23, weight: .semibold, design: .rounded))
                 Text("粘贴邮件、消息或通知，在本机提取日期、时间和会议链接。确认后加入清单。")
                     .font(.system(size: 11)).foregroundColor(Palette.secondary)
             }
@@ -191,7 +191,7 @@ private struct PasteImportView: View {
                     }
                     TextEditor(text: $source).font(.system(size: 12))
                         .scrollContentBackground(.hidden).padding(9)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 9))
+                        .background(Palette.card, in: RoundedRectangle(cornerRadius: 9))
                         .overlay(RoundedRectangle(cornerRadius: 9).stroke(Palette.line, lineWidth: 1))
                         .accessibilityLabel("待识别的邮件或文字")
                     HStack {
@@ -224,11 +224,11 @@ private struct PasteImportView: View {
                                     Toggle("结束时间", isOn: $hasEnd)
                                     if hasEnd { DatePicker("结束", selection: $end, displayedComponents: .hourAndMinute).datePickerStyle(.field) }
                                 }
-                                if invalidTime { Text("结束时间需晚于开始时间。").foregroundColor(Palette.pink) }
+                                if invalidTime { Text("结束时间需晚于开始时间。").foregroundColor(Palette.accent) }
                                 TextField("会议链接（可选）", text: $link).textFieldStyle(.roundedBorder)
                                     .accessibilityLabel("识别的会议链接")
                                 if !link.isEmpty && WebLink.safe(link) == nil {
-                                    Text("请输入完整的 http 或 https 网址。").foregroundColor(Palette.pink)
+                                    Text("请输入完整的 http 或 https 网址。").foregroundColor(Palette.accent)
                                 }
                                 if let url = WebLink.safe(link) {
                                     Link(destination: url) { Label("打开会议链接", systemImage: "arrow.up.right") }
@@ -241,7 +241,7 @@ private struct PasteImportView: View {
                                     Label("清单里已经有同名、同一天、同时间的事项。", systemImage: "checkmark.circle")
                                         .foregroundColor(Palette.green)
                                 }
-                                if source != lastParsedSource { Text("原文已更改，请重新点“识别并预览”。").foregroundColor(Palette.pink) }
+                                if source != lastParsedSource { Text("原文已更改，请重新点“识别并预览”。").foregroundColor(Palette.accent) }
                                 ForEach(Array(warnings.enumerated()), id: \.offset) { _, warning in
                                     Label(warning, systemImage: "info.circle")
                                         .font(.system(size: 10)).foregroundColor(Color(hex: 0x9A7955))
@@ -251,7 +251,7 @@ private struct PasteImportView: View {
                         }
                     } else {
                         VStack(spacing: 12) {
-                            Image(systemName: "text.viewfinder").font(.system(size: 28)).foregroundColor(Palette.pink.opacity(0.5))
+                            Image(systemName: "text.viewfinder").font(.system(size: 28)).foregroundColor(Palette.accent.opacity(0.5))
                             Text("粘贴内容后，点“识别并预览”。")
                                 .font(.system(size: 11)).foregroundColor(Palette.secondary)
                         }.frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -263,11 +263,11 @@ private struct PasteImportView: View {
                     .font(.system(size: 10)).foregroundColor(Palette.secondary)
                 Spacer()
                 Button("关闭", action: onClose).keyboardShortcut(.cancelAction)
-                Button("加入清单") { add() }.buttonStyle(.borderedProminent).tint(Palette.pink).disabled(!valid)
+                Button("加入清单") { add() }.buttonStyle(PrimaryActionStyle()).disabled(!valid)
             }
         }
         .padding(27).frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Palette.paper).foregroundColor(Palette.ink).tint(Palette.pink)
+        .background(Palette.paper).foregroundColor(Palette.ink).tint(Palette.accent)
         .onAppear { if !source.isEmpty { parse() } }
         .onChange(of: source) { _, value in
             try? String(value.prefix(50_000)).write(to: draftURL, atomically: true, encoding: .utf8)

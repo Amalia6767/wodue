@@ -19,22 +19,22 @@ struct ProjectsView: View {
             VStack(alignment: .leading, spacing: 23) {
                 HStack {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("ONE DAY AT A TIME").font(.system(size: 10, design: .monospaced)).tracking(2).foregroundColor(Palette.pink)
-                        Text("每一段投入，都在积累。").font(.system(size: 26, weight: .medium, design: .serif))
+                        Text("ONE DAY AT A TIME").font(.system(size: 10, design: .monospaced)).tracking(2).foregroundColor(Palette.coral)
+                        Text("每一段投入，都在积累。").font(.system(size: 26, weight: .semibold, design: .rounded))
                         Text("把长远的目标，落实成今天可以开始的一小段。").font(.system(size: 12)).foregroundColor(Palette.secondary)
                     }
                     Spacer()
                     Button("新建项目") { editing = LifeProject(title: "", startDay: Day.today, dueDay: Day.adding(14, to: Day.today)) }
-                        .buttonStyle(.borderedProminent).tint(Palette.pink)
+                        .buttonStyle(PrimaryActionStyle())
                 }
                 Toggle("显示已完成项目", isOn: $showCompleted).toggleStyle(.checkbox).font(.system(size: 11))
                 if visible.isEmpty {
                     VStack(alignment: .leading, spacing: 14) {
                         Image(systemName: "leaf").font(.system(size: 28)).foregroundColor(Palette.green)
-                        Text("给一件想坚持的事，留个位置。").font(.system(size: 18, design: .serif))
+                        Text("给一件想坚持的事，留个位置。").font(.system(size: 18, weight: .semibold, design: .rounded))
                         Text("备考、写作、Presentation、作品集……设置每天投入多久，专注会自动累计到这个项目。").font(.system(size: 12)).foregroundColor(Palette.secondary)
                         Button("建立第一个项目") { editing = LifeProject(title: "", startDay: Day.today, dueDay: Day.adding(14, to: Day.today)) }
-                    }.padding(28).frame(maxWidth: .infinity, alignment: .leading).background(.white, in: RoundedRectangle(cornerRadius: 14))
+                    }.padding(28).frame(maxWidth: .infinity, alignment: .leading).background(Palette.card, in: RoundedRectangle(cornerRadius: 14))
                 }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 350), spacing: 18)], spacing: 18) {
                     ForEach(visible) { project in
@@ -49,11 +49,11 @@ struct ProjectsView: View {
                         }
                         Spacer()
                         FocusControls(clock: clock).frame(maxWidth: 280)
-                    }.padding(20).background(Palette.blush.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
+                    }.padding(20).background(Palette.selection.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
                 }
                 Text("时间记录的是投入，成果由你确认。达到预估时长不会自动完成项目。").font(.system(size: 11)).foregroundColor(Palette.secondary)
             }.padding(28)
-        }.background(Palette.paper)
+        }.quietScroll()
             .sheet(item: $editing) { ProjectEditor(store: store, initial: $0) }
             .sheet(item: $detail) { ProjectDetailView(store: store, id: $0.id) }
     }
@@ -71,8 +71,8 @@ private struct ProjectCard: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 7) {
-                    Text(project.title).font(.system(size: 19, weight: .medium, design: .serif)).fixedSize(horizontal: false, vertical: true)
-                    Text(project.countdown()).font(.system(size: 11, weight: .medium)).foregroundColor(project.dueDay < Day.today && !project.completed ? Palette.pink : Palette.secondary)
+                    Text(project.title).font(.system(size: 19, weight: .semibold, design: .rounded)).fixedSize(horizontal: false, vertical: true)
+                    Text(project.countdown()).font(.system(size: 11, weight: .medium)).foregroundColor(project.dueDay < Day.today && !project.completed ? Palette.error : Palette.secondary)
                 }
                 Spacer()
                 Button("编辑目标", action: onEdit).font(.system(size: 10))
@@ -89,13 +89,13 @@ private struct ProjectCard: View {
                 Text("累计投入").font(.system(size: 10)).foregroundColor(Palette.secondary)
             }
             if let estimate = project.estimatedMinutes {
-                ProgressView(value: min(1, Double(actual) / Double(estimate))).tint(Palette.pink)
+                ProgressView(value: min(1, Double(actual) / Double(estimate))).tint(Palette.accent)
                 Text("预估投入 \(ClockText.duration(estimate)) · 还安排了 \(ClockText.duration(project.plannedMinutes(from: Day.adding(1, to: Day.today))))")
                     .font(.system(size: 10)).foregroundColor(Palette.secondary)
                 let future = max(0, target - today) + project.plannedMinutes(from: Day.adding(1, to: Day.today))
                 if actual + future < estimate {
                     Text("按现有安排，距预估投入还差 \(ClockText.duration(estimate - actual - future))。可在每日计划中调整。")
-                        .font(.system(size: 10)).foregroundColor(Palette.pink).fixedSize(horizontal: false, vertical: true)
+                        .font(.system(size: 10)).foregroundColor(Palette.accent).fixedSize(horizontal: false, vertical: true)
                 }
             }
             if let outcome = project.outcomeTarget {
@@ -104,11 +104,11 @@ private struct ProjectCard: View {
             Divider().opacity(0.5)
             HStack {
                 Button("开始 \(clock.workMinutes) 分钟") { _ = clock.start(title: project.title, projectID: project.id) }
-                    .buttonStyle(.borderedProminent).tint(Palette.pink).disabled(project.completed || clock.session != nil)
+                    .buttonStyle(PrimaryActionStyle()).disabled(project.completed || clock.session != nil)
                 Spacer()
                 Button("每日计划与记录", action: onDetail)
             }.font(.system(size: 11))
-        }.padding(22).frame(maxWidth: .infinity, alignment: .leading).background(.white, in: RoundedRectangle(cornerRadius: 14))
+        }.padding(22).frame(maxWidth: .infinity, alignment: .leading).background(Palette.card, in: RoundedRectangle(cornerRadius: 14))
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(Palette.line.opacity(0.8)))
     }
 }
@@ -141,7 +141,7 @@ struct ProjectEditor: View {
     private var valid: Bool { value.valid && (!budget || (budgetHours.isFinite && (0.02...16666).contains(budgetHours))) }
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("给目标，安排一点每天。").font(.system(size: 24, weight: .medium, design: .serif))
+            Text("给目标，安排一点每天。").font(.system(size: 24, weight: .semibold, design: .rounded))
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     TextField("项目名称，例如备考、论文或作品集", text: $draft.title).textFieldStyle(.roundedBorder).accessibilityLabel("项目名称")
@@ -149,27 +149,27 @@ struct ProjectEditor: View {
                         DatePicker("开始", selection: Binding(get: { Day.date(draft.startDay) ?? Date() }, set: { draft.startDay = Day.key($0) }), displayedComponents: .date)
                         DatePicker("目标日期", selection: Binding(get: { Day.date(draft.dueDay) ?? Date() }, set: { draft.dueDay = Day.key($0) }), displayedComponents: .date)
                     }.datePickerStyle(.field).environment(\.locale, Locale(identifier: "zh_CN"))
-                    if draft.dueDay < draft.startDay || draft.dueDay > Day.adding(1095, to: draft.startDay) { Text("目标日期需晚于或等于开始日期，最长三年。").foregroundColor(Palette.pink) }
+                    if draft.dueDay < draft.startDay || draft.dueDay > Day.adding(1095, to: draft.startDay) { Text("目标日期需晚于或等于开始日期，最长三年。").foregroundColor(Palette.accent) }
                     HStack { Text("每天计划"); TextField("分钟", value: $draft.dailyMinutes, format: .number).frame(width: 70).textFieldStyle(.roundedBorder); Text("分钟，可在每天的详情里单独调整。").foregroundColor(Palette.secondary) }
                     HStack(spacing: 7) {
                         ForEach(Array(zip([2,3,4,5,6,7,1], ["一","二","三","四","五","六","日"])), id: \.0) { day, title in
                             Button("周" + title) { if draft.weekdays.contains(day) { draft.weekdays.remove(day) } else { draft.weekdays.insert(day) } }
-                                .buttonStyle(.bordered).tint(draft.weekdays.contains(day) ? Palette.pink : Palette.secondary)
+                                .buttonStyle(.bordered).tint(draft.weekdays.contains(day) ? Palette.accent : Palette.secondary)
                         }
                     }
                     Toggle("默认安排到具体时段", isOn: $fixed)
                     if fixed {
                         DatePicker("开始时间", selection: Binding(get: { ClockText.date(Day.today, draft.defaultStartMinute ?? 540)! }, set: { draft.defaultStartMinute = ClockText.minuteNow($0) }), displayedComponents: .hourAndMinute).datePickerStyle(.field)
-                        if (draft.defaultStartMinute ?? 540) + draft.dailyMinutes > 1440 { Text("默认时段不能超过当天 24:00，请缩短或分日安排。").foregroundColor(Palette.pink) }
+                        if (draft.defaultStartMinute ?? 540) + draft.dailyMinutes > 1440 { Text("默认时段不能超过当天 24:00，请缩短或分日安排。").foregroundColor(Palette.accent) }
                     }
                     Text("未指定时段时，当天可分几次完成。目标日期当天也计入计划；如需休息，可在每日计划中设为 0 分钟。")
                         .font(.system(size: 10)).foregroundColor(Palette.secondary)
                     VStack(alignment: .leading, spacing: 8) {
                         Text("这份计划，能积累多少？").fontWeight(.medium)
                         Text("\(value.days.filter { value.plan(on: $0).minutes > 0 }.count) 个投入日 · 合计 \(ClockText.duration(value.plannedMinutes()))")
-                            .font(.system(size: 19, weight: .medium, design: .rounded)).foregroundColor(Palette.pink)
+                            .font(.system(size: 19, weight: .medium, design: .rounded)).foregroundColor(Palette.accent)
                         if !draft.overrides.isEmpty { Text("已保留 \(draft.overrides.count) 天的单独安排；修改默认节奏不会覆盖它们。").font(.system(size: 10)).foregroundColor(Palette.secondary) }
-                    }.padding(16).frame(maxWidth: .infinity, alignment: .leading).background(Palette.blush.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
+                    }.padding(16).frame(maxWidth: .infinity, alignment: .leading).background(Palette.selection.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
                     Toggle("预估项目总投入", isOn: $budget)
                     if budget { HStack { TextField("小时", value: $budgetHours, format: .number).frame(width: 80).textFieldStyle(.roundedBorder); Text("小时；用于比较安排，不代表成果已完成。") } }
                     Toggle("记录成果数量", isOn: $hasOutcome)
@@ -190,8 +190,8 @@ struct ProjectEditor: View {
                     Toggle("项目已完成（历史投入仍保留）", isOn: $draft.completed)
                 }.font(.system(size: 12)).padding(.trailing, 6)
             }
-            HStack { Spacer(); Button("取消") { dismiss() }.keyboardShortcut(.cancelAction); Button("保存项目") { if store.upsertProject(value) { dismiss() } }.buttonStyle(.borderedProminent).tint(Palette.pink).disabled(!valid) }
-        }.padding(26).frame(width: 600, height: 710).background(Palette.paper).foregroundColor(Palette.ink).tint(Palette.pink)
+            HStack { Spacer(); Button("取消") { dismiss() }.keyboardShortcut(.cancelAction); Button("保存项目") { if store.upsertProject(value) { dismiss() } }.buttonStyle(PrimaryActionStyle()).disabled(!valid) }
+        }.padding(26).frame(width: 600, height: 710).background(Palette.paper).foregroundColor(Palette.ink).tint(Palette.accent)
     }
 }
 
@@ -221,21 +221,21 @@ struct ProjectDetailView: View {
             if let project {
                 ScrollView { contents(project).padding(.trailing, 6) }
             }
-        }.padding(26).frame(width: 730, height: 720).background(Palette.paper).foregroundColor(Palette.ink).tint(Palette.pink)
+        }.padding(26).frame(width: 730, height: 720).background(Palette.paper).foregroundColor(Palette.ink).tint(Palette.accent)
             .onAppear { if let p = project { selectedDay = min(max(Day.today, p.startDay), p.dueDay); outcome = p.outcomeProgress } }
             .sheet(item: $planEditor) { ProjectDayEditor(store: store, selection: $0) }
             .sheet(item: $taskEditor) { item in TaskEditor(store: store, item: item) { _ in } }
     }
     private var header: some View {
         HStack {
-            Text(project?.title ?? "项目记录").font(.system(size: 23, weight: .medium, design: .serif))
+            Text(project?.title ?? "项目记录").font(.system(size: 23, weight: .semibold, design: .rounded))
             Spacer()
             Button("关闭") { dismiss() }
         }
     }
     private func contents(_ project: LifeProject) -> some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text(project.countdown() + " · 累计投入 " + ClockText.duration(clock.projectSeconds(id) / 60)).foregroundColor(Palette.pink)
+            Text(project.countdown() + " · 累计投入 " + ClockText.duration(clock.projectSeconds(id) / 60)).foregroundColor(Palette.accent)
             Text("剩余计划 \(ClockText.duration(project.plannedMinutes(from: Day.today))) · 修改未来计划不会改变已投入时间。")
                 .font(.system(size: 11)).foregroundColor(Palette.secondary)
             scheduleSection(project)
@@ -377,24 +377,24 @@ struct ProjectDayEditor: View {
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("给这一天，调整一点节奏。").font(.system(size: 22, weight: .medium, design: .serif))
+            Text("给这一天，调整一点节奏。").font(.system(size: 22, weight: .semibold, design: .rounded))
             Text((project?.title ?? "") + " · " + Day.formatted(selection.day, "M月d日 EEEE")).foregroundColor(Palette.secondary)
             HStack { Text("计划投入"); TextField("分钟", value: $minutes, format: .number).frame(width: 85).textFieldStyle(.roundedBorder); Text("分钟；0 表示休息") }
             Toggle("安排具体时段", isOn: $fixed)
             if fixed { DatePicker("开始", selection: $start, displayedComponents: .hourAndMinute).datePickerStyle(.field) }
             Text("已实际投入 " + ClockText.duration(FocusClock.shared.projectSeconds(selection.projectID, on: selection.day) / 60) + "；调整计划不会修改这些记录。")
                 .font(.system(size: 11)).foregroundColor(Palette.secondary)
-            if !plan.valid { Text("请输入 0–1440 分钟，具体时段需在当天结束。").foregroundColor(Palette.pink) }
+            if !plan.valid { Text("请输入 0–1440 分钟，具体时段需在当天结束。").foregroundColor(Palette.accent) }
             if fixed && minutes > 0 && !conflicts.isEmpty {
                 Text("与现有安排重叠：" + conflicts.prefix(3).map(\.title).joined(separator: "、") + "。请调整后再加入时间轴。")
-                    .font(.system(size: 11)).foregroundColor(Palette.pink)
+                    .font(.system(size: 11)).foregroundColor(Palette.accent)
             }
             if !message.isEmpty { Text(message).font(.system(size: 11)).foregroundColor(Palette.green) }
             HStack {
                 Button("恢复默认安排") { if store.setProjectPlan(selection.projectID, day: selection.day, plan: nil) { dismiss() } }
                 Spacer()
                 Button("取消") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("保存这一天") { if store.setProjectPlan(selection.projectID, day: selection.day, plan: plan) { dismiss() } }.buttonStyle(.borderedProminent).tint(Palette.pink).disabled(!plan.valid)
+                Button("保存这一天") { if store.setProjectPlan(selection.projectID, day: selection.day, plan: plan) { dismiss() } }.buttonStyle(PrimaryActionStyle()).disabled(!plan.valid)
             }
             if fixed && minutes > 0 {
                 Button("保存并加入当天时间轴") {
@@ -402,7 +402,7 @@ struct ProjectDayEditor: View {
                     else { message = "未能保存安排，请检查数据文件权限。" }
                 }.disabled(!plan.valid || !conflicts.isEmpty)
             }
-        }.font(.system(size: 12)).padding(26).frame(width: 570).background(Palette.paper).foregroundColor(Palette.ink).tint(Palette.pink)
+        }.font(.system(size: 12)).padding(26).frame(width: 570).background(Palette.paper).foregroundColor(Palette.ink).tint(Palette.accent)
     }
 }
 
@@ -432,11 +432,11 @@ struct ProjectDayStrip: View {
                         let end = start + project.plan(on: day).minutes
                         let other = PlanningEngine.busy(on: day, tasks: store.tasks, blocks: store.timeBlocks.filter { $0.projectID != project.id }) + ProjectEngine.busy(store.projects, on: day, excluding: project.id)
                         if other.contains(where: { $0.start < end && $0.end > start }) {
-                            Text("这个项目时段与其他安排重叠，可点调整重新安排。").font(.system(size: 10)).foregroundColor(Palette.pink)
+                            Text("这个项目时段与其他安排重叠，可点调整重新安排。").font(.system(size: 10)).foregroundColor(Palette.accent)
                         }
                     }
                 }
-            }.padding(17).background(Palette.blush.opacity(0.35), in: RoundedRectangle(cornerRadius: 11))
+            }.padding(17).background(Palette.selection.opacity(0.35), in: RoundedRectangle(cornerRadius: 11))
                 .sheet(item: $editing) { ProjectDayEditor(store: store, selection: $0) }
         }
     }

@@ -58,7 +58,7 @@ struct TaskEditor: View {
             HStack {
                 VStack(alignment: .leading, spacing: 7) {
                     Text(synced ? "日历里的这件事。" : "给未来，留一个位置。")
-                        .font(.system(size: 23, weight: .medium, design: .serif))
+                        .font(.system(size: 23, weight: .semibold, design: .rounded))
                     Text(synced ? "可以修改时间和内容；修正保存在本机，提醒跟随新时间。" : "这里记节点与活动；每天做多少，可以另外安排时间块。")
                         .font(.system(size: 10)).foregroundColor(Palette.secondary)
                 }
@@ -70,18 +70,18 @@ struct TaskEditor: View {
                     if synced {
                         VStack(alignment: .leading, spacing: 8) {
                             Label(restoringCalendar ? "保存后恢复日历同步" : (item.task?.calendarEdits == nil ? "来自日历 · 可在这里编辑" : "已在本机修正"), systemImage: "calendar.badge.pencil")
-                                .foregroundColor(Palette.pink)
+                                .foregroundColor(Palette.accent)
                             Text("改过的字段以本机为准，其余内容继续同步。不会修改原日历。")
                                 .font(.system(size: 10)).foregroundColor(Palette.secondary)
                             if item.task?.calendarEdits != nil && !restoringCalendar {
                                 Button("恢复日历版本", action: restoreCalendarVersion).font(.system(size: 11))
                             }
                         }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Palette.blush.opacity(0.45), in: RoundedRectangle(cornerRadius: 9))
+                            .background(Palette.selection.opacity(0.45), in: RoundedRectangle(cornerRadius: 9))
                     }
                     TextField("要完成或参加什么？", text: $title, axis: .vertical)
                         .lineLimit(2...4).font(.system(size: 14)).textFieldStyle(.plain)
-                        .padding(13).background(.white, in: RoundedRectangle(cornerRadius: 9)).focused($titleFocused)
+                        .padding(13).background(Palette.card, in: RoundedRectangle(cornerRadius: 9)).focused($titleFocused)
                         .accessibilityLabel("事项内容")
                     Picker("性质", selection: $kind) {
                         ForEach(PlanKind.allCases, id: \.self) { Text($0.rawValue).tag($0) }
@@ -109,7 +109,7 @@ struct TaskEditor: View {
                             if multiDay {
                                 DatePicker("结束日期（包含这天）", selection: $lastDate, displayedComponents: .date).datePickerStyle(.field)
                                 if Day.key(lastDate) < Day.key(date) || Day.key(lastDate) > Day.adding(366, to: Day.key(date)) {
-                                    Text("结束日期需在开始日期之后，单次行程最多 367 天。").foregroundColor(Palette.pink)
+                                    Text("结束日期需在开始日期之后，单次行程最多 367 天。").foregroundColor(Palette.accent)
                                 }
                             }
                         }
@@ -120,7 +120,7 @@ struct TaskEditor: View {
                                 if kind != .deadline { Toggle("结束", isOn: $hasEnd).toggleStyle(.checkbox) }
                             }
                             if hasEnd && kind != .deadline { DatePicker("结束时刻", selection: $end, displayedComponents: .hourAndMinute).datePickerStyle(.field) }
-                            if invalidTime { Text("同一天的结束时刻需晚于开始时刻。").foregroundColor(Palette.pink) }
+                            if invalidTime { Text("同一天的结束时刻需晚于开始时刻。").foregroundColor(Palette.accent) }
                         }
                     }.environment(\.locale, Locale(identifier: "zh_CN"))
                     if kind != .rest {
@@ -141,9 +141,9 @@ struct TaskEditor: View {
                 Text("完成后仍然保留划线内容。").font(.system(size: 10)).foregroundColor(Palette.secondary)
                 Spacer()
                 Button("取消") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("保存事项", action: save).buttonStyle(.borderedProminent).tint(Palette.pink).disabled(!valid)
+                Button("保存事项", action: save).buttonStyle(PrimaryActionStyle()).disabled(!valid)
             }
-        }.padding(26).frame(width: 530, height: 700).background(Palette.paper).foregroundColor(Palette.ink).tint(Palette.pink)
+        }.padding(26).frame(width: 530, height: 700).background(Palette.paper).foregroundColor(Palette.ink).tint(Palette.accent)
             .onAppear { titleFocused = !synced }
             .onChange(of: kind) { _, value in if value == .deadline { multiDay = false; hasEnd = false } }
             .sheet(isPresented: $showCategories) { CategoryManagerView(store: store) }

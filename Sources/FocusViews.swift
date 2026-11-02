@@ -17,17 +17,17 @@ struct FocusPane: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 17) {
             HStack {
-                Image(systemName: "timer").foregroundColor(Palette.pink)
+                Image(systemName: "timer").foregroundColor(Palette.accent)
                 Text("一段专注").font(.system(size: 13, weight: .medium))
                 Spacer()
                 Text("今天 \(clock.seconds(on: Day.today) / 60) min").font(.system(size: 10)).foregroundColor(Palette.secondary)
             }
             if let session = clock.session {
-                Text(clock.phaseText).font(.system(size: 11)).foregroundColor(session.phase == .rest ? Palette.green : Palette.pink)
-                Text(clock.clockText).font(.system(size: 44, weight: .light, design: .rounded)).monospacedDigit()
+                Text(clock.phaseText).font(.system(size: 11)).foregroundColor(session.phase == .rest ? Palette.green : Palette.accent)
+                Text(clock.clockText).font(.system(size: 48, weight: .light, design: .rounded)).monospacedDigit()
                     .frame(maxWidth: .infinity)
                 ProgressView(value: max(0, min(1, 1 - Double(clock.remaining) / Double(max(1, session.initialSeconds)))))
-                    .tint(session.phase == .rest ? Palette.green : Palette.pink)
+                    .tint(session.phase == .rest ? Palette.green : Palette.accent)
                 Text(session.title).font(.system(size: 12, weight: .medium)).fixedSize(horizontal: false, vertical: true)
                 if let hardStop = session.hardStop {
                     Text("本时段最晚到 " + hardStop.formatted(date: .omitted, time: .shortened))
@@ -35,7 +35,7 @@ struct FocusPane: View {
                 }
                 FocusControls(clock: clock)
             } else {
-                Text("\(clock.workMinutes):00").font(.system(size: 44, weight: .light, design: .rounded)).monospacedDigit()
+                Text("\(clock.workMinutes):00").font(.system(size: 48, weight: .light, design: .rounded)).monospacedDigit()
                     .frame(maxWidth: .infinity).foregroundColor(Palette.ink)
                 Picker("关联时段", selection: $selectedBlock) {
                     Text("自由专注").tag(Optional<UUID>.none)
@@ -51,7 +51,7 @@ struct FocusPane: View {
                 Button("开始专注") {
                     _ = clock.start(title: chosen?.title ?? (freeTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? (store.projects.first { $0.id == projectID }?.title ?? freeTitle) : freeTitle), blockID: chosen?.id, taskID: chosen?.taskID, projectID: chosen == nil ? projectID : chosen?.projectID,
                         hardStop: chosen.flatMap { ClockText.date($0.day, $0.endMinute) })
-                }.buttonStyle(.borderedProminent).tint(Palette.pink).frame(maxWidth: .infinity).disabled(!canStart)
+                }.buttonStyle(PrimaryActionStyle()).frame(maxWidth: .infinity).disabled(!canStart)
                 if day != Day.today { Text("未来时段先安排好，到当天再开始专注。").font(.system(size: 10)).foregroundColor(Palette.secondary) }
             }
             Divider().opacity(0.6)
@@ -78,8 +78,8 @@ struct FocusPane: View {
                 Text("未开启时，应用内仍显示倒计时与结束提示。")
                     .font(.system(size: 9)).foregroundColor(Palette.secondary)
             }
-        }.font(.system(size: 11)).padding(21).background(.white, in: RoundedRectangle(cornerRadius: 13))
-            .overlay(RoundedRectangle(cornerRadius: 13).stroke(Palette.line))
+        }.font(.system(size: 11)).padding(22).background(Palette.card, in: RoundedRectangle(cornerRadius: 18))
+            .overlay(RoundedRectangle(cornerRadius: 18).stroke(Palette.line.opacity(0.85)))
     }
 }
 
@@ -92,7 +92,7 @@ struct FocusControls: View {
                     Button("休息 \(clock.restMinutes) 分钟") { clock.beginBreak() }.buttonStyle(.borderedProminent).tint(Palette.green)
                     Button("再来一轮") { clock.nextRound() }
                 } else if phase == .readyWork {
-                    Button("开始下一轮") { clock.nextRound() }.buttonStyle(.borderedProminent).tint(Palette.pink)
+                    Button("开始下一轮") { clock.nextRound() }.buttonStyle(PrimaryActionStyle())
                 } else {
                     Button(clock.running ? "暂停" : "继续") { if clock.running { clock.pause() } else { clock.resume() } }
                 }

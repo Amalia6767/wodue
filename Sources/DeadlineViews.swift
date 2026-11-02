@@ -2,8 +2,8 @@ import SwiftUI
 import AppKit
 
 extension DeadlineStage {
-    var color: Color { Color(hex: strong ? 0xAD3E39 : 0x90601F) }
-    var tint: Color { Color(hex: strong ? 0xF9E9E5 : 0xF7EFDE) }
+    var color: Color { strong ? Palette.error : Palette.warning }
+    var tint: Color { strong ? Palette.errorTint : Palette.warningTint }
     var symbol: String { strong ? "exclamationmark.circle.fill" : "clock.badge.exclamationmark" }
 }
 
@@ -13,13 +13,16 @@ struct DeadlineBanner: View {
     @ObservedObject private var focus = FocusClock.shared
     let onEdit: (Todo) -> Void
     private var stage: DeadlineStage { reminder.items.first?.stage ?? .soon }
-    var body: some View {
+    // Hidden while nothing is due: the workbench's node list covers the calm state.
+    @ViewBuilder var body: some View {
+        if !reminder.items.isEmpty || !reminder.message.isEmpty {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 9) {
                 Image(systemName: reminder.items.isEmpty ? "checkmark.shield" : stage.symbol)
-                Text(reminder.items.isEmpty ? "DDL 提醒已准备好" :
+                Text(reminder.items.isEmpty ? "近期没有待办截止" :
                     (reminder.items.contains(where: { $0.stage == .overdue }) ? "临近截止与逾期 · \(reminder.items.count) 项" : "三天内的截止事项 · \(reminder.items.count) 项"))
                     .fontWeight(.semibold)
+                    .help("提交 / 截止事项会在三天内突出显示，临近截止逐级提醒。")
                 Spacer()
                 if RuntimeMode.demo { Text("演示数据").font(.system(size: 10)) }
                 Toggle("桌面弹窗", isOn: Binding(get: { reminder.popupsEnabled }, set: reminder.setPopups))
@@ -47,14 +50,11 @@ struct DeadlineBanner: View {
                         .buttonStyle(.plain).foregroundColor(item.stage.color).help("标为已完成，停止这件事的截止提醒")
                 }
             }
-            if reminder.items.isEmpty {
-                Text("将事项性质设为“提交 / 截止”。三天内突出显示，临近截止逐级提醒；标题以 DDL / deadline 开头的单日事项也会识别。")
-                    .font(.system(size: 10)).foregroundColor(Palette.secondary)
-            }
             if !reminder.message.isEmpty { Text(reminder.message).font(.system(size: 10)).foregroundColor(stage.color) }
-        }.padding(.horizontal, 20).padding(.vertical, 13)
+        }.padding(.horizontal, 22).padding(.vertical, reminder.items.isEmpty ? 9 : 14)
             .background(reminder.items.isEmpty ? Palette.paper : stage.tint)
-            .overlay(alignment: .leading) { Rectangle().fill(reminder.items.isEmpty ? Palette.line : stage.color).frame(width: 3) }
+            .overlay(alignment: .leading) { Rectangle().fill(reminder.items.isEmpty ? .clear : stage.color).frame(width: 3) }
+        }
     }
 }
 

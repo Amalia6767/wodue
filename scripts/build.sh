@@ -16,7 +16,8 @@ xcrun swiftc -parse-as-library -O -target "$APP_ARCH-apple-macosx14.0" \
     "${sources[@]}" -o "$APP_DIR/Contents/MacOS/Daylist" \
     -framework SwiftUI -framework AppKit -framework EventKit -framework UserNotifications
 cp "$PROJECT_ROOT/Resources/Info.plist" "$APP_DIR/Contents/Info.plist"
-xcrun swift -module-cache-path "$BUILD_ROOT/module-cache" "$PROJECT_ROOT/scripts/Icon.swift" "$BUILD_ROOT/icons"
+xcrun swift -module-cache-path "$BUILD_ROOT/module-cache" "$PROJECT_ROOT/scripts/Icon.swift" "$BUILD_ROOT/icons" "$PROJECT_ROOT/Resources/Brand/AppIcon.icns"
+cp "$PROJECT_ROOT"/Resources/Brand/*.png "$APP_DIR/Contents/Resources/"
 cp "$BUILD_ROOT/icons/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
 codesign --force --deep --sign - "$APP_DIR"
 codesign --verify --deep --strict "$APP_DIR"

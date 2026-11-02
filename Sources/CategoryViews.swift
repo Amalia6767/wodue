@@ -25,7 +25,7 @@ struct CategoryManagerView: View {
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("你的生活，由你分类。").font(.system(size: 23, weight: .medium, design: .serif))
+            Text("你的生活，由你分类。").font(.system(size: 23, weight: .semibold, design: .rounded))
             Text("作业、旅行、家庭事务，名字和颜色都可以调整。")
                 .font(.system(size: 11)).foregroundColor(Palette.secondary)
             ScrollView {
@@ -46,7 +46,7 @@ struct CategoryManagerView: View {
                 Spacer()
                 Button("完成") { if let onClose { onClose() } else { dismiss() } }.keyboardShortcut(.cancelAction)
             }
-        }.padding(26).frame(width: 550, height: 570).background(Palette.paper).foregroundColor(Palette.ink).tint(Palette.pink)
+        }.padding(26).frame(width: 550, height: 570).background(Palette.paper).foregroundColor(Palette.ink).tint(Palette.accent)
     }
 }
 
@@ -70,6 +70,6 @@ private struct CategoryEditRow: View {
             }.disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || name.count > 40)
             Button { _ = store.removeCategory(category.id) } label: { Image(systemName: "minus.circle") }
                 .buttonStyle(.plain).foregroundColor(Palette.secondary).help("移除分类，保留事项")
-        }.padding(11).background(.white, in: RoundedRectangle(cornerRadius: 9))
+        }.padding(11).background(Palette.card, in: RoundedRectangle(cornerRadius: 9))
     }
 }

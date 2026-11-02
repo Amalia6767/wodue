@@ -59,7 +59,53 @@ struct BusyInterval: Equatable {
     var title: String
 }
 
+/// Visual identity and nesting for a single-row ribbon. This does not change
+/// event times, completion state, or the user's calendar data.
+enum RibbonLayout {
+    struct Segment {
+        var id: UUID
+        var start: Int
+        var end: Int
+    }
+    struct Style: Equatable {
+        var tone: Int
+        var level: Int
+    }
+    static func ordered(_ segments: [Segment]) -> [Segment] {
+        segments.sorted {
+            if $0.end - $0.start != $1.end - $1.start { return $0.end - $0.start > $1.end - $1.start }
+            if $0.start != $1.start { return $0.start < $1.start }
+            return $0.id.uuidString < $1.id.uuidString
+        }
+    }
+    static func styles(_ segments: [Segment], toneCount: Int = 6) -> [UUID: Style] {
+        let count = max(1, toneCount)
+        var result: [UUID: Style] = [:]
+        var placed: [Segment] = []
+        for segment in ordered(segments) {
+            let neighbors = placed.filter { $0.start < segment.end && segment.start < $0.end }
+            let levels = Set(neighbors.compactMap { result[$0.id]?.level })
+            let tones = Set(neighbors.compactMap { result[$0.id]?.tone })
+            var level = 0
+            while levels.contains(level) { level += 1 }
+            let preferred = placed.count % count
+            let tone = (0..<count).map { (preferred + $0) % count }.first { !tones.contains($0) } ?? preferred
+            result[segment.id] = Style(tone: tone, level: level)
+            placed.append(segment)
+        }
+        return result
+    }
+}
+
 enum PlanningEngine {
+    /// Prefer a linked block that is happening now, then the next one today.
+    /// Finished time slots must never be advertised as a future reminder.
+    static func pendingBlock(taskID: UUID, on day: String, at minute: Int, blocks: [TimeBlock]) -> TimeBlock? {
+        blocks.filter { $0.taskID == taskID && $0.day == day && !$0.completed && !$0.isRest && $0.endMinute > minute }
+            .sorted { ($0.startMinute, $0.createdAt, $0.id.uuidString) < ($1.startMinute, $1.createdAt, $1.id.uuidString) }
+            .first
+    }
+
     static func busy(on day: String, tasks: [Todo], blocks: [TimeBlock], excluding blockID: UUID? = nil) -> [BusyInterval] {
         let planned = blocks.filter { $0.day == day && $0.id != blockID }.map { BusyInterval(start: $0.startMinute, end: $0.endMinute, title: $0.title) }
         let fixed = tasks.filter { $0.occurs(on: day) && $0.resolvedKind != .deadline }.compactMap { task -> BusyInterval? in

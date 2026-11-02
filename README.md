@@ -8,6 +8,8 @@ A quiet macOS desktop planner that gets louder as deadlines approach.
 
 [下载 macOS 版（Apple Silicon）](https://github.com/Amalia6767/wodue/releases/tag/v0.4.0) · [功能总览](docs/功能总览.md) · [中文使用说明](docs/使用说明.md) · [Privacy](docs/PRIVACY.md) · [MIT License](LICENSE)
 
+**主分支源码已更新今日工作台、u 杯和可区分重叠事件的动线。** 上方安装包仍为 v0.4.0；体验最新界面请按下方步骤从源码构建。更新记录见 [Changelog](CHANGELOG.md)。
+
 我Due！为课程作业、邮件通知、Presentation 和个人活动交织的生活而做：把未来节点落实为今天的时间安排，再用专注与休息一段段推进。
 
 平时，桌面便签几乎没有底色；鼠标移入，底板和操作浮现。临近截止时，提醒逐级变明显；会议和活动提前 15 分钟提醒，卡片里可直接打开已保存的链接。
@@ -17,7 +19,7 @@ A quiet macOS desktop planner that gets louder as deadlines approach.
 | Feature | Behavior |
 | --- | --- |
 | Quiet desktop note | Transparent at rest; readable text, hover controls, pinning, inline add and compact project progress. Unfinished items come first; completed text stays visible with a strikethrough. |
-| Daily rhythm | Time blocks with start/end times, linked preparation, overlap warnings and space for breaks. |
+| Daily rhythm | A daily workbench with activity/focus controls, a u-cup, upcoming milestones and a single-row ribbon. Overlapping events have distinct opaque tones and inset outlines; dark hover cards show times, duration, status and the full wrapping title. Unfinished blocks come first in the checklist. |
 | Ongoing projects | Custom goals and target dates, recurring daily effort, weekday rules, date-specific exceptions and total-time previews. Project-linked focus accumulates actual active time; optional outcomes and multiple milestones stay separate. |
 | Project reminders | A persistent countdown and configurable daily reminders from the project start, or a chosen lead time. The nearest three reminders are queued and replenished while running or on reopening. |
 | Long-term plans | Submission deadlines, presentations, workshops, exhibitions and multi-day travel; editable categories and colors. |

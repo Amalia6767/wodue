@@ -1,8 +1,8 @@
 import SwiftUI
 import AppKit
 
-private let eventInk = Color(hex: 0xAD3E39)
-private let eventTint = Color(hex: 0xF9E9E5)
+private let eventInk = Palette.error
+private let eventTint = Palette.errorTint
 
 struct EventReminderStatus: View {
     let task: Todo
@@ -16,7 +16,7 @@ struct EventReminderStatus: View {
                 }
                 if let url = item.link {
                     Link(destination: url) { Label("打开活动链接", systemImage: "video") }
-                        .font(.system(size: 11, weight: .medium)).foregroundColor(Palette.pink)
+                        .font(.system(size: 11, weight: .medium)).foregroundColor(Palette.accent)
                         .help(url.host ?? "活动链接")
                 }
             }
@@ -31,7 +31,7 @@ struct EventBanner: View {
         if let item = next {
             let urgent = item.stage(at: Date()) != nil
             HStack(spacing: 12) {
-                Image(systemName: urgent ? "bell.badge.fill" : "video").foregroundColor(urgent ? eventInk : Palette.pink)
+                Image(systemName: urgent ? "bell.badge.fill" : "video").foregroundColor(urgent ? eventInk : Palette.accent)
                 VStack(alignment: .leading, spacing: 5) {
                     Text((urgent ? item.countdown(at: Date()) : "下一场活动") + " · " + item.task.title)
                         .font(.system(size: 11, weight: .semibold)).lineLimit(1)
@@ -40,7 +40,7 @@ struct EventBanner: View {
                 }
                 Spacer(minLength: 0)
                 if let url = item.link {
-                    Link("打开活动链接", destination: url).font(.system(size: 11, weight: .medium)).foregroundColor(Palette.pink)
+                    Link("打开活动链接", destination: url).font(.system(size: 11, weight: .medium)).foregroundColor(Palette.accent)
                 }
                 Button("查看活动") { reminder.show(id: item.id) }.font(.system(size: 10))
                 if !reminder.notificationsEnabled && !RuntimeMode.demo {
@@ -48,7 +48,7 @@ struct EventBanner: View {
                 }
             }.padding(.horizontal, 20).padding(.vertical, 12)
                 .foregroundColor(Palette.ink).background(urgent ? eventTint : Palette.sidebar.opacity(0.55))
-                .overlay(alignment: .leading) { Rectangle().fill(urgent ? eventInk : Palette.pink).frame(width: 3) }
+                .overlay(alignment: .leading) { Rectangle().fill(urgent ? eventInk : Palette.accent).frame(width: 3) }
         }
     }
 }
