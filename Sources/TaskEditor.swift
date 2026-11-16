@@ -136,9 +136,17 @@ struct TaskEditor: View {
                     TextField("备注、地址、会议号…", text: $notes, axis: .vertical).lineLimit(2...5).textFieldStyle(.roundedBorder)
                     if kind == .deadline { Text("提前三天突出提醒，今天、两小时内及半小时内逐级弹出。未填写时刻时只按日期提醒，不会猜测 23:59。准备工作可另排时间块。").font(.system(size: 10)).foregroundColor(Palette.secondary) }
                 }.font(.system(size: 12)).padding(.trailing, 5)
-            }
+            }.quietScroll()
             HStack {
-                Text("完成后仍然保留划线内容。").font(.system(size: 10)).foregroundColor(Palette.secondary)
+                if baseline != nil && !synced {
+                    Button("删除事项", role: .destructive) {
+                        if let id = item.task?.id, store.deleteTask(id) { dismiss() }
+                    }.foregroundColor(Palette.error).help("删除后 12 秒内可以在主窗口撤销")
+                } else if synced {
+                    Text("来自系统日历的活动，请在日历里删除。").font(.system(size: 10)).foregroundColor(Palette.secondary)
+                } else {
+                    Text("完成后仍然保留划线内容。").font(.system(size: 10)).foregroundColor(Palette.secondary)
+                }
                 Spacer()
                 Button("取消") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("保存事项", action: save).buttonStyle(PrimaryActionStyle()).disabled(!valid)

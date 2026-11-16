@@ -155,3 +155,66 @@ enum PlanningEngine {
         }
     }
 }
+
+/// Calendar projection only: reading a month never writes or moves saved plans.
+enum MonthPlanning {
+    struct Entry: Identifiable {
+        enum Kind { case task, block, project }
+        var id: String
+        var kind: Kind
+        var sourceID: UUID
+        var title: String
+        var time: String?
+        var minute: Int?
+        var completed: Bool
+        var deadline: Bool = false
+    }
+    static func monthStart(_ day: String) -> String {
+        guard let date = Day.date(day), let first = Day.calendar.date(from: Day.calendar.dateComponents([.year, .month], from: date)) else { return day }
+        return Day.key(first)
+    }
+    static func shiftMonth(_ day: String, by offset: Int) -> String {
+        let first = monthStart(day)
+        guard let date = Day.date(first), let next = Day.calendar.date(byAdding: .month, value: offset, to: date) else { return first }
+        return Day.key(next)
+    }
+    static func days(in month: String) -> [String] {
+        let first = monthStart(month)
+        guard let date = Day.date(first), let count = Day.calendar.range(of: .day, in: .month, for: date)?.count else { return [] }
+        let offset = (Day.calendar.component(.weekday, from: date) + 5) % 7
+        let cellCount = ((offset + count + 6) / 7) * 7
+        return (0..<cellCount).map { Day.adding($0 - offset, to: first) }
+    }
+    static func entries(on day: String, tasks: [Todo], blocks: [TimeBlock], projects: [LifeProject], query: String = "") -> [Entry] {
+        let dailyBlocks = blocks.filter { $0.day == day }
+        var result = tasks.filter { $0.occurs(on: day) }.map { task -> Entry in
+            let time: String?
+            if task.resolvedKind == .deadline { time = task.startMinute.map { "截止 " + ClockText.minute($0) } ?? "当天截止" }
+            else if let start = task.start(on: day) {
+                time = ClockText.minute(start) + (task.end(on: day).map { "–" + ClockText.minute($0) } ?? "")
+            } else { time = task.lastDay > task.day ? "多日活动" : nil }
+            return Entry(id: "task-" + task.id.uuidString, kind: .task, sourceID: task.id, title: task.title, time: time,
+                         minute: task.start(on: day), completed: task.completed, deadline: task.resolvedKind == .deadline)
+        }
+        result += dailyBlocks.map { block in
+            Entry(id: "block-" + block.id.uuidString, kind: .block, sourceID: block.id, title: block.title,
+                  time: block.timeLabel, minute: block.startMinute, completed: block.completed)
+        }
+        for project in projects where !project.completed {
+            let plan = project.plan(on: day)
+            guard plan.minutes > 0, !dailyBlocks.contains(where: { $0.projectID == project.id && $0.projectPlanDay == day }) else { continue }
+            let time = plan.startMinute.map { ClockText.minute($0) + "–" + ClockText.minute($0 + plan.minutes) } ?? "灵活 · " + ClockText.duration(plan.minutes)
+            result.append(Entry(id: "project-" + project.id.uuidString, kind: .project, sourceID: project.id, title: project.title,
+                                time: time, minute: plan.startMinute, completed: false))
+        }
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return result.filter { query.isEmpty || $0.title.localizedCaseInsensitiveContains(query) }.sorted {
+            if $0.completed != $1.completed { return !$0.completed }
+            let a = $0.minute ?? ($0.kind == .project ? 1441 : -1)
+            let b = $1.minute ?? ($1.kind == .project ? 1441 : -1)
+            if a != b { return a < b }
+            if $0.title != $1.title { return $0.title < $1.title }
+            return $0.id < $1.id
+        }
+    }
+}

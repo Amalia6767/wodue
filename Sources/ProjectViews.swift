@@ -8,6 +8,7 @@ struct ProjectsView: View {
     @ProjectState private var editing: LifeProject?
     @ProjectState private var detail: LifeProject?
     @ProjectState private var showCompleted = false
+    @ProjectState private var deleting: LifeProject?
     private var visible: [LifeProject] {
         store.projects.filter { showCompleted || !$0.completed }.sorted {
             if $0.completed != $1.completed { return !$0.completed }
@@ -38,7 +39,8 @@ struct ProjectsView: View {
                 }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 350), spacing: 18)], spacing: 18) {
                     ForEach(visible) { project in
-                        ProjectCard(project: project, clock: clock, onEdit: { editing = project }, onDetail: { detail = project })
+                        ProjectCard(project: project, clock: clock, onEdit: { editing = project }, onDetail: { detail = project },
+                                    onDelete: { deleting = project })
                     }
                 }
                 if clock.session != nil {
@@ -56,6 +58,35 @@ struct ProjectsView: View {
         }.quietScroll()
             .sheet(item: $editing) { ProjectEditor(store: store, initial: $0) }
             .sheet(item: $detail) { ProjectDetailView(store: store, id: $0.id) }
+            .projectDeletion($deleting, store: store)
+    }
+}
+
+/// Asks once before deleting a project, and says what happens to its history.
+private struct ProjectDeletion: ViewModifier {
+    @Binding var project: LifeProject?
+    let store: TodoStore
+    var onDeleted: () -> Void = {}
+    func body(content: Content) -> some View {
+        content.confirmationDialog("删除「\(project?.title ?? "")」？", isPresented: Binding(get: { project != nil }, set: { if !$0 { project = nil } }),
+                                   titleVisibility: .visible, presenting: project) { value in
+            Button("删除项目", role: .destructive) {
+                if store.deleteProject(value.id) { onDeleted() }
+                project = nil
+            }
+            Button("取消", role: .cancel) { project = nil }
+        } message: { value in
+            let spent = FocusClock.shared.projectSeconds(value.id) / 60
+            Text(spent > 0
+                 ? "项目和之后的计划时段会删除。已经专注的 \(ClockText.duration(spent)) 会留在专注记录里，只是不再算进这个项目。删除后 12 秒内可以撤销。"
+                 : "项目和之后的计划时段会删除。删除后 12 秒内可以撤销。")
+        }
+    }
+}
+
+extension View {
+    func projectDeletion(_ project: Binding<LifeProject?>, store: TodoStore, onDeleted: @escaping () -> Void = {}) -> some View {
+        modifier(ProjectDeletion(project: project, store: store, onDeleted: onDeleted))
     }
 }
 
@@ -64,6 +95,7 @@ private struct ProjectCard: View {
     @ObservedObject var clock: FocusClock
     let onEdit: () -> Void
     let onDetail: () -> Void
+    let onDelete: () -> Void
     private var actual: Int { clock.projectSeconds(project.id) / 60 }
     private var today: Int { clock.projectSeconds(project.id, on: Day.today) / 60 }
     private var target: Int { project.plan(on: Day.today).minutes }
@@ -71,11 +103,22 @@ private struct ProjectCard: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 7) {
-                    Text(project.title).font(.system(size: 19, weight: .semibold, design: .rounded)).fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 8) {
+                        if let tone = ProjectTone.of(project.colorID) { Circle().fill(Color(hex: tone.hex)).frame(width: 10, height: 10) }
+                        Text(project.title).font(.system(size: 19, weight: .semibold, design: .rounded)).fixedSize(horizontal: false, vertical: true)
+                    }
                     Text(project.countdown()).font(.system(size: 11, weight: .medium)).foregroundColor(project.dueDay < Day.today && !project.completed ? Palette.error : Palette.secondary)
                 }
                 Spacer()
                 Button("编辑目标", action: onEdit).font(.system(size: 10))
+                Menu {
+                    Button("编辑目标", action: onEdit)
+                    Button("每日计划与记录", action: onDetail)
+                    Divider()
+                    Button("删除项目…", role: .destructive, action: onDelete)
+                } label: {
+                    Image(systemName: "ellipsis").font(.system(size: 13, weight: .semibold)).foregroundColor(Palette.secondary).frame(width: 24, height: 22)
+                }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help("更多操作")
             }
             VStack(alignment: .leading, spacing: 8) {
                 HStack { Text("今天"); Spacer(); Text(target > 0 ? "\(ClockText.duration(today)) / \(ClockText.duration(target))" : "\(ClockText.duration(today)) · 今天不设投入量") }
@@ -110,6 +153,12 @@ private struct ProjectCard: View {
             }.font(.system(size: 11))
         }.padding(22).frame(maxWidth: .infinity, alignment: .leading).background(Palette.card, in: RoundedRectangle(cornerRadius: 14))
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(Palette.line.opacity(0.8)))
+            .contextMenu {
+                Button("编辑目标", action: onEdit)
+                Button("每日计划与记录", action: onDetail)
+                Divider()
+                Button("删除项目…", role: .destructive, action: onDelete)
+            }
     }
 }
 
@@ -123,6 +172,7 @@ struct ProjectEditor: View {
     @ProjectState private var hasOutcome: Bool
     @ProjectState private var fixed: Bool
     @ProjectState private var limited: Bool
+    @ProjectState private var deleting: LifeProject?
     init(store: TodoStore, initial: LifeProject) {
         self.store = store; self.initial = initial
         _draft = State(initialValue: initial); _budget = State(initialValue: initial.estimatedMinutes != nil)
@@ -145,6 +195,13 @@ struct ProjectEditor: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     TextField("项目名称，例如备考、论文或作品集", text: $draft.title).textFieldStyle(.roundedBorder).accessibilityLabel("项目名称")
+                    HStack(spacing: 10) {
+                        Text("颜色")
+                        toneButton(nil)
+                        ForEach(ProjectTone.all) { toneButton($0) }
+                        Text(ProjectTone.of(draft.colorID).map { $0.name + " · 动线和今日安排里用这个颜色" } ?? "默认 · 跟随动线色阶")
+                            .font(.system(size: 10)).foregroundColor(Palette.secondary)
+                    }
                     HStack {
                         DatePicker("开始", selection: Binding(get: { Day.date(draft.startDay) ?? Date() }, set: { draft.startDay = Day.key($0) }), displayedComponents: .date)
                         DatePicker("目标日期", selection: Binding(get: { Day.date(draft.dueDay) ?? Date() }, set: { draft.dueDay = Day.key($0) }), displayedComponents: .date)
@@ -189,9 +246,27 @@ struct ProjectEditor: View {
                     }
                     Toggle("项目已完成（历史投入仍保留）", isOn: $draft.completed)
                 }.font(.system(size: 12)).padding(.trailing, 6)
+            }.quietScroll()
+            HStack {
+                if store.projects.contains(where: { $0.id == initial.id }) {
+                    Button("删除项目…", role: .destructive) { deleting = initial }.foregroundColor(Palette.error)
+                }
+                Spacer()
+                Button("取消") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("保存项目") { if store.upsertProject(value) { dismiss() } }.buttonStyle(PrimaryActionStyle()).disabled(!valid)
             }
-            HStack { Spacer(); Button("取消") { dismiss() }.keyboardShortcut(.cancelAction); Button("保存项目") { if store.upsertProject(value) { dismiss() } }.buttonStyle(PrimaryActionStyle()).disabled(!valid) }
         }.padding(26).frame(width: 600, height: 710).background(Palette.paper).foregroundColor(Palette.ink).tint(Palette.accent)
+            .projectDeletion($deleting, store: store, onDeleted: { dismiss() })
+    }
+    private func toneButton(_ tone: ProjectTone?) -> some View {
+        let on = draft.colorID == tone?.id
+        return Button { draft.colorID = tone?.id } label: {
+            ZStack {
+                if let tone { Circle().fill(Color(hex: tone.hex)) }
+                else { Circle().fill(Color.white).overlay(Circle().stroke(Palette.ink(0.25), style: StrokeStyle(lineWidth: 1, dash: [2, 2]))) }
+                if on { Circle().stroke(Palette.ink, lineWidth: 2).padding(-4) }
+            }.frame(width: 18, height: 18).contentShape(Circle())
+        }.buttonStyle(.plain).help(tone?.name ?? "默认颜色").accessibilityLabel(tone?.name ?? "默认颜色")
     }
 }
 
@@ -219,7 +294,7 @@ struct ProjectDetailView: View {
         VStack(alignment: .leading, spacing: 18) {
             header
             if let project {
-                ScrollView { contents(project).padding(.trailing, 6) }
+                ScrollView { contents(project).padding(.trailing, 6) }.quietScroll()
             }
         }.padding(26).frame(width: 730, height: 720).background(Palette.paper).foregroundColor(Palette.ink).tint(Palette.accent)
             .onAppear { if let p = project { selectedDay = min(max(Day.today, p.startDay), p.dueDay); outcome = p.outcomeProgress } }
@@ -392,6 +467,8 @@ struct ProjectDayEditor: View {
             if !message.isEmpty { Text(message).font(.system(size: 11)).foregroundColor(Palette.green) }
             HStack {
                 Button("恢复默认安排") { if store.setProjectPlan(selection.projectID, day: selection.day, plan: nil) { dismiss() } }
+                Button("这天不安排") { if store.setProjectPlan(selection.projectID, day: selection.day, plan: ProjectDayPlan(minutes: 0)) { dismiss() } }
+                    .help("这一天休息，不计入计划；已专注的时间仍然保留")
                 Spacer()
                 Button("取消") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("保存这一天") { if store.setProjectPlan(selection.projectID, day: selection.day, plan: plan) { dismiss() } }.buttonStyle(PrimaryActionStyle()).disabled(!plan.valid)

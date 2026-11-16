@@ -119,5 +119,54 @@ enum ProjectTests {
         let legacyAfter = try Data(contentsOf: migrationLegacy)
         check(legacyAfter == oldBytes, "Project-aware focus writes keep the legacy focus file unchanged")
         check(ReminderBudget.deadlines + ReminderBudget.events + 2 * ReminderBudget.blocks + ReminderBudget.projects + 1 <= 64, "Project reminders fit within the shared system-notification budget")
+
+        // 11/16 feedback: deletion with undo, project unlinking, focus spans, colours.
+        let fbDir = root.appendingPathComponent("feedback-1116", isDirectory: true)
+        try FileManager.default.createDirectory(at: fbDir, withIntermediateDirectories: true)
+        let fb = TodoStore(fileURL: fbDir.appendingPathComponent("tasks.json"), seedIfMissing: false)
+        let fbClock = FocusClock(fileURL: fbDir.appendingPathComponent("focus-v2.json"), runTimer: false)
+        var guide = LifeProject(title: "导游资格", startDay: "2026-11-01", dueDay: "2026-12-01"); guide.dailyMinutes = 300; guide.colorID = "plum"
+        check(guide.valid && fb.upsertProject(guide), "A project with a brand tone colour saves")
+        var badTone = guide; badTone.colorID = "neon-green"
+        check(!badTone.valid, "Colours outside the coral and purple-ink families are rejected")
+        var node = Todo(title: "模拟考", day: "2026-11-05"); node.kind = .deadline; node.projectID = guide.id
+        _ = fb.upsert(node)
+        var slot = TimeBlock(title: "导游资格", day: "2026-11-05", startMinute: 600, endMinute: 660); slot.projectID = guide.id; slot.projectPlanDay = "2026-11-05"
+        var kept = TimeBlock(title: "刷题", day: "2026-11-02", startMinute: 600, endMinute: 660); kept.projectID = guide.id; kept.completed = true
+        var linkedToNode = TimeBlock(title: "准备模拟考", day: "2026-11-04", startMinute: 540, endMinute: 600); linkedToNode.taskID = node.id
+        _ = fb.upsertBlock(slot); _ = fb.upsertBlock(kept); _ = fb.upsertBlock(linkedToNode)
+        let t0 = Date(timeIntervalSince1970: 1_793_000_040)
+        _ = fbClock.start(title: guide.title, projectID: guide.id, now: t0); fbClock.end(now: t0.addingTimeInterval(1500))
+        check(fbClock.projectSeconds(guide.id) == 1500, "Focus started from a project counts toward it")
+        let spanDay = Day.key(t0)
+        let spans = fbClock.spans(on: spanDay, now: t0.addingTimeInterval(1600))
+        check(spans.count == 1 && spans[0].end - spans[0].start == 25 && spans[0].projectID == guide.id && !spans[0].live, "A finished project focus appears as one real-time span on its day")
+        check(fbClock.spans(on: spanDay).first?.id == spans.first?.id, "Focus span ids stay stable between refreshes")
+        _ = fbClock.start(title: "自由专注", now: t0.addingTimeInterval(3600))
+        let live = fbClock.spans(on: spanDay, now: t0.addingTimeInterval(3600 + 600))
+        check(live.count == 2 && live.last?.live == true && live.last.map { $0.end - $0.start } == 10, "A running round shows as a live span up to now")
+        fbClock.end(now: t0.addingTimeInterval(3600 + 600))
+
+        check(fb.deleteProject(guide.id, focus: fbClock), "Deleting a project succeeds")
+        check(!fb.projects.contains { $0.id == guide.id } && fb.tasks.first { $0.id == node.id }?.projectID == nil, "Deleting a project removes it and unlinks its nodes")
+        check(!fb.timeBlocks.contains { $0.id == slot.id } && fb.timeBlocks.first { $0.id == kept.id }?.projectID == nil, "Upcoming plan slots go away; finished blocks stay without the link")
+        check(fbClock.logs.count == 2 && fbClock.projectSeconds(guide.id) == 0 && fbClock.seconds(on: spanDay) == 2100, "Focus history is kept but no longer counts toward the deleted project")
+        fb.undo?.restore()
+        check(fb.projects.contains { $0.id == guide.id } && fb.tasks.first { $0.id == node.id }?.projectID == guide.id
+              && fb.timeBlocks.first { $0.id == slot.id } != nil && fb.timeBlocks.first { $0.id == kept.id }?.projectID == guide.id
+              && fbClock.projectSeconds(guide.id) == 1500, "Undo restores the project, its links, slots and focus credit")
+
+        check(fb.deleteTask(node.id) && !fb.tasks.contains { $0.id == node.id }, "Deleting a task removes it")
+        check(fb.timeBlocks.first { $0.id == linkedToNode.id }?.taskID == nil, "Blocks that pointed at a deleted task stay but lose the link")
+        fb.undo?.restore()
+        check(fb.tasks.contains { $0.id == node.id } && fb.timeBlocks.first { $0.id == linkedToNode.id }?.taskID == node.id, "Undo restores a deleted task and relinks its blocks")
+        check(fb.deleteBlock(linkedToNode.id) && !fb.timeBlocks.contains { $0.id == linkedToNode.id }, "Deleting a time block removes it")
+        fb.undo?.restore()
+        check(fb.timeBlocks.contains { $0.id == linkedToNode.id }, "Undo restores a deleted time block")
+        var synced = Todo(title: "日历活动", day: "2026-11-06"); synced.calendarSource = CalendarReference(key: "fb-cal", calendarID: "example", calendarName: "Demo", allDay: false, eventStart: Date(timeIntervalSince1970: 1_793_000_000))
+        _ = fb.upsert(synced)
+        check(!fb.deleteTask(synced.id) && fb.tasks.contains { $0.id == synced.id }, "Calendar-synced events cannot be deleted locally, since the next sync would bring them back")
+        let reloaded = TodoStore(fileURL: fbDir.appendingPathComponent("tasks.json"), seedIfMissing: false)
+        check(reloaded.projects.first { $0.id == guide.id }?.colorID == "plum", "Project colours persist across restarts")
     }
 }

@@ -37,6 +37,22 @@ struct FocusLog: Identifiable, Codable, Equatable {
         return day == key ? seconds : 0
     }
 }
+struct FocusSpan: Identifiable, Equatable {
+    var id: UUID
+    var start: Int
+    var end: Int
+    var title: String
+    var projectID: UUID?
+    var blockID: UUID?
+    var live: Bool
+    /// A stable id per sitting, so hover and selection survive refreshes.
+    static func identity(_ log: UUID, _ index: Int) -> UUID {
+        var bytes = log.uuid
+        bytes.15 ^= UInt8(truncatingIfNeeded: index); bytes.14 ^= UInt8(truncatingIfNeeded: index >> 8) ^ 0x5A
+        return UUID(uuid: bytes)
+    }
+}
+
 private struct FocusDocument: Codable {
     var session: FocusSession?
     var logs: [FocusLog]
@@ -157,6 +173,53 @@ final class FocusClock: ObservableObject {
         guard slices.count <= 10000, slices.allSatisfy({ $0.end >= $0.start && $0.seconds <= 7200 }),
               slices.reduce(0, { $0 + $1.seconds }) == seconds else { return false }
         return zip(slices, slices.dropFirst()).allSatisfy { $0.end <= $1.start }
+    }
+
+    /// Keeps the focus history of a deleted project but stops counting it
+    /// toward that project. Returns the logs that changed, for undo.
+    func unlinkProject(_ id: UUID) -> [UUID] {
+        var changed: [UUID] = []
+        for i in logs.indices where logs[i].projectID == id { logs[i].projectID = nil; changed.append(logs[i].id) }
+        let running = session?.projectID == id
+        if running { session?.projectID = nil }
+        if running || !changed.isEmpty { persist(); scheduleProjectNotifications() }
+        return changed
+    }
+    func relinkProject(_ id: UUID, logs ids: [UUID]) {
+        guard !ids.isEmpty else { return }
+        let set = Set(ids)
+        for i in logs.indices where set.contains(logs[i].id) && logs[i].projectID == nil { logs[i].projectID = id }
+        persist(); scheduleProjectNotifications()
+    }
+
+    /// Real focus time on a day, as minute ranges from the recorded slices.
+    /// Pauses shorter than two minutes are bridged so one sitting stays one span.
+    func spans(on day: String, now: Date = Date()) -> [FocusSpan] {
+        guard let date = Day.date(day) else { return [] }
+        let lower = Day.calendar.startOfDay(for: date)
+        guard let upper = Day.calendar.date(byAdding: .day, value: 1, to: lower) else { return [] }
+        var sources: [(FocusLog, Bool)] = logs.map { ($0, false) }
+        if let current = session, current.phase == .work, !logs.contains(where: { $0.id == current.id }) {
+            sources.append((focusLog(current, now: now), current.activeSince != nil))
+        }
+        var result: [FocusSpan] = []
+        for (log, live) in sources {
+            guard let slices = log.slices, !slices.isEmpty else { continue }
+            var merged: [(Date, Date)] = []
+            for slice in slices.sorted(by: { $0.start < $1.start }) {
+                if let last = merged.last, slice.start.timeIntervalSince(last.1) < 120 { merged[merged.count - 1].1 = max(last.1, slice.end) }
+                else { merged.append((slice.start, slice.end)) }
+            }
+            for (index, range) in merged.enumerated() {
+                let start = max(range.0, lower), end = min(range.1, upper)
+                guard end.timeIntervalSince(start) >= 60 else { continue }
+                let first = Int(start.timeIntervalSince(lower) / 60)
+                let last = min(1440, Int(ceil(end.timeIntervalSince(lower) / 60)))
+                result.append(FocusSpan(id: FocusSpan.identity(log.id, index), start: first, end: max(first + 1, last), title: log.title,
+                                        projectID: log.projectID, blockID: log.blockID, live: live && index == merged.count - 1))
+            }
+        }
+        return result.sorted { $0.start < $1.start }
     }
 
     func updateBlock(_ block: TimeBlock, now: Date = Date()) {

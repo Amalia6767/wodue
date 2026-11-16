@@ -4,25 +4,28 @@
 
 **给每一天，留一点余地。** A quiet macOS desktop planner that gets louder as deadlines approach.
 
-[下载 v0.5.0（Apple Silicon）](https://github.com/Amalia6767/wodue/releases/download/v0.5.0/wodue-macos-arm64.zip) · [版本说明与校验文件](https://github.com/Amalia6767/wodue/releases/tag/v0.5.0) · [从源码构建](#build-and-run) · [功能总览](docs/功能总览.md) · [中文使用说明](docs/使用说明.md) · [MIT License](LICENSE)
+[下载 v0.6.0（Apple Silicon）](https://github.com/Amalia6767/wodue/releases/download/v0.6.0/wodue-macos-arm64.zip) · [版本说明与校验文件](https://github.com/Amalia6767/wodue/releases/tag/v0.6.0) · [从源码构建](#build-and-run) · [功能总览](docs/功能总览.md) · [中文使用说明](docs/使用说明.md) · [MIT License](LICENSE)
 
-**v0.5.0 包含新版今日工作台、u 杯、嘴形 u Logo 和可区分重叠事件的动线。** 下载解压后，将「我Due！.app」放入 Applications。适用于 Apple Silicon Mac、macOS 14 及以上；此公开预览版尚未 Apple 公证。更新记录见 [Changelog](CHANGELOG.md)。
+**v0.6.0：从任何入口开始的专注都会自动画进一天的动线并计入 u 杯；动线可以直接拖动改时长；事项、时间块和长期项目都能删除并撤销。** 下载解压后，将「我Due！.app」放入 Applications。适用于 Apple Silicon Mac、macOS 14 及以上；此公开预览版尚未 Apple 公证。更新记录见 [Changelog](CHANGELOG.md)。
 
 我Due！为课程作业、邮件通知、Presentation 和个人活动交织的生活而做：把未来节点落实为今天的时间安排，再用专注与休息一段段推进。
 
 平时，桌面便签几乎没有底色；鼠标移入，底板和操作浮现。临近截止时，提醒逐级变明显；会议和活动提前 15 分钟提醒，卡片里可直接打开已保存的链接。
 
-## 新版工作台
+## 今日工作台
 
-![新版今日节奏工作台：专注控制、u杯、重叠事件动线、清单、节点与长期项目](docs/preview.svg)
+![今日节奏工作台：此刻卡、u 杯、带实际专注斜纹的一天动线、今日安排、长期项目目标与折叠的逾期节点](docs/workbench-v0.6.png)
 
-*v0.5.0 工作台界面示意，全部日程为虚构数据；不是实际截图。*
+*v0.6.0 实际界面截图，日程均为虚构的演示数据。*
 
-- **从今天开始推进**：当前事项、专注与休息、近期节点和项目进展放在同一个工作台。
-- **看见已经做过的事**：u 杯呈现当日计划完成进度，长期项目另行累计实际专注投入。
-- **重叠也能看清**：不同事件使用独立紫灰色阶与内嵌边界；悬停查看时间、时长、状态和完整标题。未完成在前，完成后仍保留划线内容。
+- **专注过的时间，自动出现在动线上**：不论从长期项目卡片、工作台还是菜单开始专注，都按真实的开始和结束时间画成斜纹小段；颜色跟随长期项目，正在进行的会实时变长。
+- **u 杯 = 排好的时段 + 实际专注**：没排计划的专注同时计入计划和完成，杯子下方分别显示「计划」和「另专注」。
+- **动线可以直接拖**：拖动一段的两端改时长，拖中间平移，在空白处拖出一段新的时间；右键可编辑或删除。
+- **长期项目的每日目标**：设了每天投入、但不固定时段的项目，会在今日安排里显示「已专注 / 还差多少」和开始专注按钮。
+- **删除都能撤销**：事项、时间块、节点和长期项目都可删除，12 秒内可撤销；删除长期项目时，已专注的时间保留在历史里，只是不再计入该项目。
+- **逾期不再挤占节点**：两项以上逾期折叠成一行，点开处理，后面的节点照常显示。
 
-![动线细节示意：重叠时间段保持独立轮廓，上方深色卡片显示事项信息](docs/ribbon-detail.svg)
+![一天的动线：斜纹为实际专注，颜色跟随长期项目，深色描边为当前选中的时段](docs/ribbon-v0.6.png)
 
 ## Logo 与品牌
 
@@ -37,8 +40,9 @@ u 既是字母，也是正在发音的嘴；上方的珊瑚水滴延续了感叹
 | Feature | Behavior |
 | --- | --- |
 | Quiet desktop note | Transparent at rest; readable text, hover controls, pinning, inline add and compact project progress. Unfinished items come first; completed text stays visible with a strikethrough. |
-| Daily rhythm | A daily workbench with activity/focus controls, a u-cup, upcoming milestones and a single-row ribbon. Overlapping events have distinct opaque tones and inset outlines; dark hover cards show times, duration, status and the full wrapping title. Unfinished blocks come first in the checklist. |
-| Ongoing projects | Custom goals and target dates, recurring daily effort, weekday rules, date-specific exceptions and total-time previews. Project-linked focus accumulates actual active time; optional outcomes and multiple milestones stay separate. |
+| Daily rhythm | A daily workbench with activity/focus controls, a u-cup, upcoming milestones and a single-row ribbon. Overlapping events have distinct opaque tones and inset outlines; dark hover cards show times, duration, status and the full wrapping title. Drag a segment's edges to resize it, its middle to move it, or drag across empty time to create one; right-click to edit or delete. Unfinished blocks come first in the checklist; two or more overdue milestones fold into one expandable row. |
+| Real focus on the timeline | Every focus round, whichever screen started it, is drawn on the ribbon at its recorded active times as a hatched span in the project's colour. The u-cup counts planned slots plus real focus, so unplanned focus still fills it. |
+| Ongoing projects | Custom goals and target dates, recurring daily effort, weekday rules, date-specific exceptions and total-time previews. Project-linked focus accumulates actual active time; optional outcomes and multiple milestones stay separate. Projects can take one of six coral/purple-ink tones; flexible daily targets appear in today's list with time done and time left. |
 | Project reminders | A persistent countdown and configurable daily reminders from the project start, or a chosen lead time. The nearest three reminders are queued and replenished while running or on reopening. |
 | Long-term plans | Submission deadlines, presentations, workshops, exhibitions and multi-day travel; editable categories and colors. |
 | Deadline radar | Highlights the next 72 hours, then escalates on the day, in the last two hours, in the last 30 minutes and when overdue. Date-only items stay date-only. |
@@ -48,9 +52,11 @@ u 既是字母，也是正在发音的嘴；上方的珊瑚水滴延续了感叹
 | Mac Calendar | Read-only mirroring of selected calendars through EventKit. Local completion never changes source events. Imported items can be edited locally, with per-field corrections protected from later sync and an option to restore the latest calendar version. |
 | Paste to import | Local parsing of email/event text and Canvas assignments/notices, with an editable preview before saving. |
 | Deadline updates | Canvas publication time decides which notification wins, including when a newer notice moves a deadline earlier. |
+| Month overview | “这几天” switches between a month grid and a four-day focus; click a date to open its full schedule. |
+| Delete and undo | Tasks, blocks, milestones and projects can be deleted from editors, row menus and the ribbon, with a 12-second undo. Deleting a project keeps its focus history but stops counting it toward that project. Calendar-mirrored events are deleted in Calendar instead. |
 | Local data | JSON persistence, import/export, and separate focus/reminder state. No app-owned cloud service. |
 
-Completing a preparation block does **not** mark its assignment submitted. You decide when the underlying deadline is complete. Reaching an effort estimate does not automatically finish a project or count as an outcome. Pauses, breaks and offline time are excluded from new focus records; active time is allocated across calendar days.
+Completing a preparation block does **not** mark its assignment submitted. You decide when the underlying deadline is complete. Reaching an effort estimate does not automatically finish a project or count as an outcome. Pauses, breaks and offline time are excluded from new focus records; active time is allocated across calendar days. Older focus records without recorded start/end times still count toward totals but are not drawn on the ribbon.
 
 ## Build and run
 
@@ -102,7 +108,7 @@ Normal data lives in:
 ~/Library/Application Support/io.github.amalia6767.wodue/
 ```
 
-`tasks.json` stores tasks/projects/categories/blocks (schema 4); `focus-v2.json` stores project-aware focus state and history, with the original `focus.json` retained during migration; `deadline-reminders.json` stores deadline acknowledgments and snoozes; `event-reminders.json` stores meeting acknowledgments and snoozes. Paste drafts are also local. Back up this directory to preserve everything. JSON plan exports contain tasks, projects, categories and blocks, but not the separate focus/reminder files.
+`tasks.json` stores tasks/projects/categories/blocks (schema 4; projects may carry an optional colour); `focus-v2.json` stores project-aware focus state and history, with the original `focus.json` retained during migration; `deadline-reminders.json` stores deadline acknowledgments and snoozes; `event-reminders.json` stores meeting acknowledgments and snoozes. Paste drafts are also local. Back up this directory to preserve everything. JSON plan exports contain tasks, projects, categories and blocks, but not the separate focus/reminder files.
 
 This public source tree contains fictional examples only. Personal calendars, task exports, imported text, meeting links and local build artifacts are excluded. See [PRIVACY.md](docs/PRIVACY.md) before sharing logs or screenshots.
 

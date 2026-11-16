@@ -6,7 +6,7 @@ private typealias PlanState<Value> = SwiftUI.State<Value>
 /// One thing placed on the day's line: a time block, a timed task or calendar
 /// event, or a long-term project's planned slot.
 private struct AgendaItem: Identifiable {
-    enum Kind { case block, task, project }
+    enum Kind { case block, task, project, focus }
     var kind: Kind
     var id: UUID
     var start: Int
@@ -18,7 +18,9 @@ private struct AgendaItem: Identifiable {
     var block: TimeBlock? = nil
     var task: Todo? = nil
     var project: LifeProject? = nil
+    var span: FocusSpan? = nil
     var finish: Int { end ?? start + 15 }
+    var projectID: UUID? { project?.id ?? block?.projectID ?? task?.projectID ?? span?.projectID }
 }
 
 enum Workbench {
@@ -79,7 +81,7 @@ struct DailyPlannerView: View {
     @PlanState private var editor: BlockEditorItem?
     @PlanState private var projectEditor: ProjectDaySelection?
     @PlanState private var selectedID: UUID?
-    @PlanState private var removed: TimeBlock?
+    @PlanState private var overdueOpen = false
     @PlanState private var categories = false
     @PlanState private var filter = ""
     @PlanState private var customRhythm = false
@@ -106,6 +108,57 @@ struct DailyPlannerView: View {
         }
         return items.filter { filter.isEmpty || $0.categoryID == filter }.sorted { ($0.start, $0.title) < ($1.start, $1.title) }
     }
+    /// Real focus time from any entry point: timeline, hero, project card or menu.
+    private var focusItems: [AgendaItem] {
+        focus.spans(on: day).map { span in
+            AgendaItem(kind: .focus, id: span.id, start: span.start, end: span.end, title: span.title, categoryID: nil,
+                       completed: !span.live, isRest: false, project: store.projects.first { $0.id == span.projectID }, span: span)
+        }
+    }
+    /// Long-term projects with a daily target but no fixed time: shown as a goal, not a slot.
+    private var targets: [LifeProject] {
+        guard filter.isEmpty else { return [] }
+        return store.projects.filter { !$0.completed && $0.plan(on: day).minutes > 0 && $0.plan(on: day).startMinute == nil }
+            .sorted { ($0.dueDay, $0.title) < ($1.dueDay, $1.title) }
+    }
+    private func tone(_ item: AgendaItem) -> UInt32? { store.projects.first { $0.id == item.projectID }.flatMap { ProjectTone.of($0.colorID)?.hex } }
+    private func canRetime(_ item: AgendaItem) -> Bool {
+        switch item.kind {
+        case .block, .project: return true
+        case .task: return item.task.map { $0.calendarSource == nil && $0.lastDay == $0.day && $0.endMinute != nil } ?? false
+        case .focus: return false
+        }
+    }
+    private func retime(_ item: AgendaItem, _ start: Int, _ end: Int) {
+        switch item.kind {
+        case .block:
+            guard var block = item.block else { return }
+            block.startMinute = start; block.endMinute = end
+            if store.upsertBlock(block) { focus.updateBlock(block) }
+        case .project:
+            if let project = item.project { _ = store.setProjectPlan(project.id, day: day, plan: ProjectDayPlan(minutes: end - start, startMinute: start)) }
+        case .task:
+            guard var task = item.task, end < 1440 else { return }
+            task.startMinute = start; task.endMinute = end
+            _ = store.upsert(task)
+        case .focus: break
+        }
+    }
+    private func edit(_ item: AgendaItem) {
+        switch item.kind {
+        case .block: if let block = item.block { editor = BlockEditorItem(block: block, day: day) }
+        case .task: if let task = item.task { onEdit(task) }
+        case .project: if let project = item.project { projectEditor = ProjectDaySelection(projectID: project.id, day: day) }
+        case .focus: break
+        }
+    }
+    private func delete(_ item: AgendaItem) {
+        switch item.kind {
+        case .block: store.deleteBlock(item.id)
+        case .task: store.deleteTask(item.id)
+        default: break
+        }
+    }
     private var points: [Todo] {
         store.tasks(on: day).filter { ($0.resolvedKind == .deadline || $0.start(on: day) == nil) && (filter.isEmpty || $0.categoryID == filter) }
     }
@@ -115,49 +168,48 @@ struct DailyPlannerView: View {
         if let current = items.first(where: { live($0, now) && !$0.completed && !$0.isRest }) { return current }
         return items.first { !$0.completed && !$0.isRest && (!isToday || $0.finish > now) }
     }
-    // Overlapping segments count once, so the cup never plans more hours than the day has.
-    private func planned(_ items: [AgendaItem]) -> Int {
-        Workbench.covered(items.filter { !$0.isRest && $0.kind != .task }.map { ($0.start, $0.finish) })
+    // Overlapping segments count once, so the cup never plans more hours than
+    // the day has. Real focus time counts as both planned and done.
+    private func plannedRanges(_ items: [AgendaItem]) -> [(Int, Int)] {
+        items.filter { !$0.isRest && ($0.kind == .block || $0.kind == .project) }.map { ($0.start, $0.finish) }
     }
-    private func finished(_ items: [AgendaItem]) -> Int {
-        let work = items.filter { !$0.isRest && $0.kind != .task }
-        let blocks = Workbench.covered(work.filter { $0.kind == .block && $0.completed }.map { ($0.start, $0.finish) })
-        let projects = work.filter { $0.kind == .project }.reduce(0) { total, item in
-            total + min(item.finish - item.start, item.project.map { focus.projectSeconds($0.id, on: day) / 60 } ?? 0)
-        }
-        return min(planned(items), blocks + projects)
+    private func planned(_ items: [AgendaItem], _ focusItems: [AgendaItem]) -> Int {
+        Workbench.covered(plannedRanges(items) + focusItems.map { ($0.start, $0.finish) })
+    }
+    private func finished(_ items: [AgendaItem], _ focusItems: [AgendaItem]) -> Int {
+        let done = items.filter { !$0.isRest && $0.completed && ($0.kind == .block || $0.kind == .project) }.map { ($0.start, $0.finish) }
+        return min(planned(items, focusItems), Workbench.covered(done + focusItems.map { ($0.start, $0.finish) }))
     }
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             let now = ClockText.minuteNow(context.date)
             let items = agenda
+            let spans = focusItems
             let chosen = target(items, now: now)
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     header
                     HStack(alignment: .top, spacing: 16) {
                         hero(chosen, items: items, now: now)
-                        CupCard(planned: planned(items), done: finished(items)).frame(width: 272)
+                        CupCard(planned: planned(items, spans), done: finished(items, spans),
+                                extra: planned(items, spans) - Workbench.covered(plannedRanges(items)),
+                                milestone: items.filter { $0.completed && !$0.isRest }.count + spans.filter(\.completed).count)
+                            .frame(width: 272)
                     }.fixedSize(horizontal: false, vertical: true)
-                    DayRibbon(items: items, isToday: isToday, now: now, selectedID: chosen?.id,
+                    DayRibbon(items: items, focus: spans, isToday: isToday, now: now, selectedID: chosen?.id,
+                              tone: tone, canRetime: canRetime,
                               onSelect: { selectedID = $0 },
                               onAdd: { start, end in
                                   editor = BlockEditorItem(block: TimeBlock(title: "", day: day, startMinute: start, endMinute: end), day: day)
-                              })
+                              },
+                              onEdit: edit, onDelete: delete, onRetime: retime)
                     HStack(alignment: .top, spacing: 16) {
                         agendaList(items, now: now, selected: chosen?.id)
                         VStack(spacing: 12) {
                             nodesCard
                             projectsCard
                         }.frame(width: 312)
-                    }
-                    if let removed {
-                        HStack {
-                            Text("已移除「\(removed.title)」").lineLimit(1)
-                            Spacer()
-                            Button("撤销") { _ = store.upsertBlock(removed); self.removed = nil }
-                        }.font(.system(size: 12)).padding(12).glassCard(radius: 10)
                     }
                 }.padding(.horizontal, 32).padding(.vertical, 24)
             }.quietScroll()
@@ -334,6 +386,8 @@ struct DailyPlannerView: View {
                 case .project:
                     Button("调整这天") { if let project = item.project { projectEditor = ProjectDaySelection(projectID: project.id, day: day) } }
                         .buttonStyle(GlassButtonStyle(height: 44))
+                case .focus:
+                    EmptyView()
                 }
                 Text(meta).font(.system(size: 12)).foregroundColor(Palette.secondary).lineLimit(2)
             }
@@ -439,7 +493,7 @@ struct DailyPlannerView: View {
             }
         case .project:
             if let project = item.project { _ = focus.start(title: project.title, projectID: project.id, hardStop: ClockText.date(day, item.finish)) }
-        case .task: break
+        case .task, .focus: break
         }
     }
 
@@ -450,13 +504,14 @@ struct DailyPlannerView: View {
             if !block.completed && focus.session?.blockID == block.id { focus.end() }
             store.toggleBlock(block.id)
         case .task: store.toggle(item.id)
-        case .project: break
+        case .project, .focus: break
         }
     }
 
     private func tag(_ item: AgendaItem) -> String {
         switch item.kind {
         case .project: return "长期项目"
+        case .focus: return "专注"
         case .task: return store.category(item.categoryID)?.name ?? (item.task?.calendarSource != nil ? "日历" : "事项")
         case .block: return store.category(item.categoryID)?.name ?? (item.isRest ? "休息" : "时间块")
         }
@@ -485,6 +540,14 @@ struct DailyPlannerView: View {
             ForEach(items.filter { !$0.completed } + items.filter(\.completed)) { item in
                 agendaRow(item, now: now, selected: item.id == selected)
             }
+            if !targets.isEmpty {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(isToday ? "长期项目 · 今天的目标" : "长期项目 · 这天的目标").font(.system(size: 11)).foregroundColor(Palette.secondary)
+                    Spacer()
+                    Text("不用排时段，专注会自动记进动线").font(.system(size: 11)).foregroundColor(Palette.secondary)
+                }.padding(.horizontal, 10).padding(.top, 12).padding(.bottom, 4)
+                ForEach(targets) { project in targetRow(project) }
+            }
             if !points.isEmpty {
                 Text(isToday ? "今天要交 · 不限时间" : "当天要交 · 不限时间").font(.system(size: 11)).foregroundColor(Palette.secondary)
                     .padding(.horizontal, 10).padding(.top, 12).padding(.bottom, 4)
@@ -508,6 +571,7 @@ struct DailyPlannerView: View {
                 .accessibilityLabel((item.completed ? "标为未完成：" : "完成：") + item.title)
             Button { selectedID = item.id } label: {
                 HStack(spacing: 8) {
+                    if let hex = tone(item) { Circle().fill(Color(hex: hex)).frame(width: 8, height: 8) }
                     Text(item.title.isEmpty ? "未命名的一段" : item.title).font(.system(size: 13, weight: selected ? .bold : .medium))
                         .strikethrough(item.completed).foregroundColor(item.completed ? Palette.ink(0.45) : Palette.ink).lineLimit(1)
                     if isLive {
@@ -528,17 +592,19 @@ struct DailyPlannerView: View {
             Menu {
                 switch item.kind {
                 case .block:
-                    Button("编辑") { if let block = item.block { editor = BlockEditorItem(block: block, day: day) } }
-                    Button("移除时间块") {
-                        if let block = item.block {
-                            if focus.session?.blockID == block.id { focus.end() }
-                            store.removeBlock(block.id); removed = block
-                        }
-                    }
+                    Button("编辑") { edit(item) }
+                    Divider()
+                    Button("删除时间块", role: .destructive) { delete(item) }
                 case .task:
-                    Button("编辑") { if let task = item.task { onEdit(task) } }
+                    Button("编辑") { edit(item) }
+                    if item.task?.calendarSource == nil {
+                        Divider()
+                        Button("删除事项", role: .destructive) { delete(item) }
+                    }
                 case .project:
-                    Button("调整这天的安排") { if let project = item.project { projectEditor = ProjectDaySelection(projectID: project.id, day: day) } }
+                    Button("调整这天的安排") { edit(item) }
+                case .focus:
+                    EmptyView()
                 }
             } label: {
                 Image(systemName: "ellipsis").foregroundColor(Palette.secondary)
@@ -563,7 +629,52 @@ struct DailyPlannerView: View {
                 Button("安排时间") { editor = BlockEditorItem(task: task, day: day) }.buttonStyle(.plain)
                     .font(.system(size: 12, weight: .medium)).foregroundColor(Palette.coralText)
             }
+            Menu {
+                Button("编辑") { onEdit(task) }
+                if task.calendarSource == nil {
+                    Divider()
+                    Button("删除事项", role: .destructive) { store.deleteTask(task.id) }
+                }
+            } label: {
+                Image(systemName: "ellipsis").foregroundColor(Palette.secondary)
+            }.menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 20)
         }.padding(.horizontal, 10).frame(height: 40)
+    }
+
+    private func targetRow(_ project: LifeProject) -> some View {
+        let goal = project.plan(on: day).minutes
+        let spent = focus.projectSeconds(project.id, on: day) / 60
+        let reached = spent >= goal
+        let running = focus.session?.projectID == project.id
+        let color = ProjectTone.of(project.colorID).map { Color(hex: $0.hex) } ?? Palette.coral
+        return HStack(spacing: 12) {
+            Text("目标 " + Workbench.shortDuration(goal)).font(.system(size: 12)).monospacedDigit().foregroundColor(Palette.secondary)
+                .frame(width: 96, alignment: .leading)
+            ZStack {
+                Circle().stroke(Palette.ink(0.12), lineWidth: 3)
+                Circle().trim(from: 0, to: goal > 0 ? min(1, Double(spent) / Double(goal)) : 0)
+                    .stroke(color, style: StrokeStyle(lineWidth: 3, lineCap: .round)).rotationEffect(.degrees(-90))
+                if reached { Image(systemName: "checkmark").font(.system(size: 9, weight: .heavy)).foregroundColor(color) }
+            }.frame(width: 20, height: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(project.title).font(.system(size: 13, weight: .medium)).foregroundColor(Palette.ink).lineLimit(1)
+                Text(reached ? "已专注 \(ClockText.duration(spent))，今天的目标达成了"
+                             : "已专注 \(ClockText.duration(spent)) · 还差 \(ClockText.duration(goal - spent))")
+                    .font(.system(size: 11)).foregroundColor(reached ? Palette.coralText : Palette.secondary).lineLimit(1)
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            if running {
+                Text("专注中").font(.system(size: 12, weight: .semibold)).foregroundColor(Palette.coralText)
+            } else if isToday {
+                Button(reached ? "再专注一轮" : "开始专注") { _ = focus.start(title: project.title, projectID: project.id) }
+                    .buttonStyle(.plain).font(.system(size: 12, weight: .semibold)).foregroundColor(Palette.coralText)
+                    .disabled(focus.session != nil)
+            }
+            Menu {
+                Button("调整这一天") { projectEditor = ProjectDaySelection(projectID: project.id, day: day) }
+            } label: {
+                Image(systemName: "ellipsis").foregroundColor(Palette.secondary)
+            }.menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 20)
+        }.padding(.horizontal, 10).frame(height: 44)
     }
 
     private func checkMark(done: Bool, faint: Bool, action: @escaping () -> Void) -> some View {
@@ -578,23 +689,48 @@ struct DailyPlannerView: View {
 
     // MARK: Nodes and projects
 
-    private var upcoming: [Todo] {
-        let overdue = store.tasks.filter(Workbench.isOverdue).sorted { $0.lastDay < $1.lastDay }
+    private var overdueTasks: [Todo] { store.tasks.filter(Workbench.isOverdue).sorted { $0.lastDay < $1.lastDay } }
+    /// Overdue items fold into one line so they never push future nodes away.
+    private var futureNodes: [Todo] {
         let rest = PlanningEngine.priorities(store.tasks).filter { !Workbench.isOverdue($0) && ($0.resolvedKind == .deadline || $0.resolvedKind == .event) }
-        return Array((overdue + rest).prefix(4))
+        return Array(rest.prefix(overdueTasks.isEmpty ? 4 : 3))
     }
 
     private var nodesCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let overdue = overdueTasks
+        return VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 Text("接下来的节点").font(.system(size: 13, weight: .semibold))
                 Spacer()
                 Button("全部", action: onOpenHorizon).buttonStyle(.plain).font(.system(size: 12)).foregroundColor(Palette.secondary)
             }.padding(.bottom, 6)
-            if upcoming.isEmpty {
+            if overdue.isEmpty && futureNodes.isEmpty {
                 Text("近期没有节点，安心推进手头的事。").font(.system(size: 12)).foregroundColor(Palette.secondary).padding(.vertical, 10)
             }
-            ForEach(upcoming) { task in
+            if overdue.count == 1 {
+                Rectangle().fill(Palette.ink(0.06)).frame(height: 1)
+                nodeRow(overdue[0])
+            } else if overdue.count > 1 {
+                Rectangle().fill(Palette.ink(0.06)).frame(height: 1)
+                Button { withAnimation(.easeOut(duration: 0.2)) { overdueOpen.toggle() } } label: {
+                    HStack(spacing: 12) {
+                        VStack(spacing: 2) {
+                            Text("\(overdue.count)").font(.system(size: 17, weight: .bold)).monospacedDigit()
+                            Text("项").font(.system(size: 10))
+                        }.frame(width: 46, height: 42).foregroundColor(.white).background(Palette.coral, in: RoundedRectangle(cornerRadius: 10))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(overdue.count) 项已逾期").font(.system(size: 12, weight: .semibold)).foregroundColor(Palette.ink)
+                            Text(overdueOpen ? "完成、改期，或删掉不再需要的" : "点开处理，不挤占后面的节点").font(.system(size: 11)).foregroundColor(Palette.secondary)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: overdueOpen ? "chevron.up" : "chevron.down").font(.system(size: 11, weight: .semibold)).foregroundColor(Palette.secondary)
+                    }.padding(.vertical, 7).contentShape(Rectangle())
+                }.buttonStyle(.plain)
+                if overdueOpen {
+                    ForEach(overdue) { task in nodeRow(task).padding(.leading, 12) }
+                }
+            }
+            ForEach(futureNodes) { task in
                 Rectangle().fill(Palette.ink(0.06)).frame(height: 1)
                 nodeRow(task)
             }
@@ -625,8 +761,20 @@ struct DailyPlannerView: View {
                     Text(meta).font(.system(size: 11)).foregroundColor(Palette.secondary).lineLimit(1)
                 }
                 Spacer(minLength: 0)
+                Menu { nodeMenu(task) } label: {
+                    Image(systemName: "ellipsis").font(.system(size: 12)).foregroundColor(Palette.secondary).frame(width: 18, height: 22)
+                }.menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 20).help("完成、改期或删除")
             }.padding(.vertical, 7).contentShape(Rectangle())
         }.buttonStyle(.plain)
+        .contextMenu { nodeMenu(task) }
+    }
+    @ViewBuilder private func nodeMenu(_ task: Todo) -> some View {
+        Button("编辑 / 改期") { onEdit(task) }
+        Button(task.completed ? "标为未完成" : "标为完成") { store.toggle(task.id) }
+        if task.calendarSource == nil {
+            Divider()
+            Button("删除", role: .destructive) { store.deleteTask(task.id) }
+        }
     }
 
     @ViewBuilder private var projectsCard: some View {
@@ -663,8 +811,15 @@ struct DailyPlannerView: View {
 private struct CupCard: View {
     let planned: Int
     let done: Int
+    var extra = 0
+    var milestone = 0
     @PlanState private var drops = 0
     private var progress: Double { planned > 0 ? min(1, Double(done) / Double(planned)) : 0 }
+    private var planLines: [String] {
+        let scheduled = planned - extra
+        if scheduled > 0 { return ["计划 " + ClockText.duration(scheduled)] + (extra > 0 ? ["另专注 " + ClockText.duration(extra)] : []) }
+        return [extra > 0 ? "没排计划，专注也算数" : "还没有计划"]
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
@@ -681,14 +836,16 @@ private struct CupCard: View {
                     }
                     (Text("已完成 ") + Text(ClockText.duration(done)).fontWeight(.semibold).foregroundColor(Palette.ink))
                         .font(.system(size: 12)).foregroundColor(Palette.secondary)
-                    Text(planned > 0 ? "计划 " + ClockText.duration(planned) : "还没有计划").font(.system(size: 12)).foregroundColor(Palette.secondary)
+                    ForEach(planLines, id: \.self) { line in
+                        Text(line).font(.system(size: 12)).foregroundColor(Palette.secondary).lineLimit(1).minimumScaleFactor(0.85)
+                    }
                 }
             }.frame(maxHeight: .infinity)
         }
         .padding(.horizontal, 20).padding(.vertical, 18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .glassCard()
-        .onChange(of: done) { old, new in if new > old { drops += 1 } }
+        .onChange(of: milestone) { old, new in if new > old { drops += 1 } }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("今天已完成 \(ClockText.duration(done))，占计划的 \(Int((progress * 100).rounded()))%")
     }
@@ -840,23 +997,45 @@ private struct RibbonPointerArea: NSViewRepresentable {
     }
 }
 
-/// The day as one line. Segments only show state; the title appears on hover,
-/// and empty space turns into "+ 排一段" under the pointer.
+/// The day as one line. Segments only show state; the title appears on hover.
+/// Real focus time sits on top as inset coral pieces. Segment edges can be
+/// dragged to change the length, the middle to move it, and dragging across
+/// empty space draws a new segment.
 private struct DayRibbon: View {
     let items: [AgendaItem]
+    let focus: [AgendaItem]
     let isToday: Bool
     let now: Int
     let selectedID: UUID?
+    let tone: (AgendaItem) -> UInt32?
+    let canRetime: (AgendaItem) -> Bool
     let onSelect: (UUID) -> Void
     let onAdd: (Int, Int) -> Void
+    let onEdit: (AgendaItem) -> Void
+    let onDelete: (AgendaItem) -> Void
+    let onRetime: (AgendaItem, Int, Int) -> Void
     @PlanState private var hovered: UUID?
     @PlanState private var ghost: Range<Int>?
+    @PlanState private var drag: RibbonDrag?
 
-    private var startHour: Int { min(8, (items.map(\.start).min() ?? 480) / 60) }
+    private enum DragMode: Equatable { case create, move, leading, trailing }
+    private struct RibbonDrag: Equatable {
+        var id: UUID?
+        var mode: DragMode
+        var originStart: Int
+        var originEnd: Int
+        var start: Int
+        var end: Int
+        var moved = false
+    }
+
+    private var startHour: Int { min(8, ((items + focus).map(\.start).min() ?? 480) / 60) }
     private let endHour = 24
     private var span: Double { Double((endHour - startHour) * 60) }
     private var showNow: Bool { isToday && now >= startHour * 60 && now <= endHour * 60 }
     private func x(_ minute: Int, _ width: CGFloat) -> CGFloat { CGFloat(Double(minute - startHour * 60) / span) * width }
+    private func minutes(_ dx: CGFloat, _ width: CGFloat) -> Int { width > 0 ? Int((Double(dx / width) * span / 5).rounded()) * 5 : 0 }
+    private func minuteAt(_ px: CGFloat, _ width: CGFloat) -> Int { min(1440, max(0, startHour * 60 + minutes(px, width))) }
     private var segments: [RibbonLayout.Segment] { items.map { .init(id: $0.id, start: $0.start, end: $0.finish) } }
     private var styles: [UUID: RibbonLayout.Style] { RibbonLayout.styles(segments) }
     private var layered: [AgendaItem] {
@@ -864,10 +1043,19 @@ private struct DayRibbon: View {
         return RibbonLayout.ordered(segments).compactMap { byID[$0.id] }
     }
     private var trackHeight: CGFloat { max(40, 30 + CGFloat(styles.values.map(\.level).max() ?? 0) * 6) }
+    private func range(_ item: AgendaItem) -> (Int, Int) {
+        if let drag, drag.id == item.id { return (drag.start, drag.end) }
+        return (item.start, item.finish)
+    }
     private func rect(_ item: AgendaItem, width: CGFloat) -> CGRect {
+        let (start, end) = range(item)
+        if item.kind == .focus {
+            let height = trackHeight - 18
+            return CGRect(x: x(start, width) + 1, y: (trackHeight - height) / 2, width: max(3, x(end, width) - x(start, width) - 2), height: height)
+        }
         let height = trackHeight - 8 - CGFloat(styles[item.id]?.level ?? 0) * 6
-        return CGRect(x: x(item.start, width) + 2, y: (trackHeight - height) / 2,
-                      width: max(4, x(item.finish, width) - x(item.start, width) - 4), height: height)
+        return CGRect(x: x(start, width) + 2, y: (trackHeight - height) / 2,
+                      width: max(4, x(end, width) - x(start, width) - 4), height: height)
     }
     private func isLive(_ item: AgendaItem) -> Bool { isToday && item.start <= now && now < item.finish }
     // Opaque event tones stay distinct even when several events are live.
@@ -876,10 +1064,30 @@ private struct DayRibbon: View {
     private static let quietTones: [UInt32] = [0xDED8E4, 0xEFEAF2, 0xD5CEDD, 0xE8E1ED, 0xDAD3E1, 0xE4DDE9]
     private static let pending = Color(hex: 0x96929A)
     private static let quiet = Color(hex: 0xDAD7D9)
+    /// A project colour washed toward white, still opaque so overlaps read cleanly.
+    private static func wash(_ hex: UInt32, _ amount: Double) -> Color {
+        func channel(_ shift: UInt32) -> Double { Double((hex >> shift) & 255) / 255 * amount + (1 - amount) }
+        return Color(.sRGB, red: channel(16), green: channel(8), blue: channel(0), opacity: 1)
+    }
     private func fill(_ item: AgendaItem) -> Color {
+        if item.kind == .focus { return tone(item).map { Color(hex: $0) } ?? Palette.coral }
+        if let hex = tone(item) {
+            if item.completed || item.isRest { return Self.wash(hex, 0.3) }
+            return isLive(item) ? Color(hex: hex) : Self.wash(hex, 0.62)
+        }
         let tone = styles[item.id]?.tone ?? 0
         if item.completed || item.isRest { return Color(hex: Self.quietTones[tone]) }
         return Color(hex: (isLive(item) ? Self.liveTones : Self.pendingTones)[tone])
+    }
+    private func hit(_ point: CGPoint, width w: CGFloat) -> AgendaItem? {
+        focus.reversed().first { rect($0, width: w).contains(point) } ?? layered.reversed().first { rect($0, width: w).contains(point) }
+    }
+    private func edge(_ point: CGPoint, of item: AgendaItem, width w: CGFloat) -> DragMode {
+        let box = rect(item, width: w)
+        let grip = min(8, box.width / 3)
+        if point.x <= box.minX + grip { return .leading }
+        if point.x >= box.maxX - grip { return .trailing }
+        return .move
     }
 
     var body: some View {
@@ -889,6 +1097,12 @@ private struct DayRibbon: View {
                 legend(Palette.ink, "进行中")
                 legend(Self.pending, "待做")
                 legend(Self.quiet, "已完成 / 休息")
+                HStack(spacing: 6) {
+                    RoundedRectangle(cornerRadius: 3).fill(Palette.coral)
+                        .overlay(FocusHatch(gap: 4).stroke(.white.opacity(0.5), lineWidth: 1).clipShape(RoundedRectangle(cornerRadius: 3)))
+                        .frame(width: 14, height: 8)
+                    Text("实际专注")
+                }.font(.system(size: 11)).foregroundColor(Palette.secondary).help("斜纹 = 真实专注过的时间，颜色跟随长期项目")
                 if isToday {
                     HStack(spacing: 6) {
                         Capsule().fill(Palette.coral).frame(width: 2, height: 12)
@@ -896,7 +1110,7 @@ private struct DayRibbon: View {
                     }.font(.system(size: 11)).foregroundColor(Palette.secondary)
                 }
                 Spacer()
-                Text("独立色阶区分事项 · 空白处可安排时间").font(.system(size: 11)).foregroundColor(Palette.secondary)
+                Text("拖动两端改时长 · 空白处拖出一段").font(.system(size: 11)).foregroundColor(Palette.secondary)
             }
             GeometryReader { proxy in
                 let w = proxy.size.width
@@ -907,15 +1121,35 @@ private struct DayRibbon: View {
                             .frame(width: max(0, x(now, w)))
                     }
                     Color.clear.contentShape(Rectangle())
-                        .onTapGesture { location in
-                            if let slot = slot(at: location.x, width: w) { onAdd(slot.lowerBound, slot.upperBound) }
-                        }
+                        .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .named("ribbon"))
+                            .onChanged { value in
+                                guard drag != nil || abs(value.translation.width) >= 4 else { return }
+                                let a = minuteAt(value.startLocation.x, w), b = minuteAt(value.location.x, w)
+                                drag = RibbonDrag(id: nil, mode: .create, originStart: a, originEnd: a, start: min(a, b), end: max(max(a, b), min(a, b) + 5), moved: true)
+                                ghost = nil; hovered = nil
+                            }
+                            .onEnded { value in
+                                if let current = drag, current.mode == .create {
+                                    drag = nil
+                                    if current.end - current.start >= 10 { onAdd(current.start, current.end) }
+                                } else if let slot = slot(at: value.location.x, width: w) {
+                                    onAdd(slot.lowerBound, slot.upperBound)
+                                }
+                                drag = nil
+                            })
                         .accessibilityHidden(true)
-                    if let ghost, hovered == nil {
+                    if let ghost, hovered == nil, drag == nil {
                         RoundedRectangle(cornerRadius: 8).fill(Palette.coral(0.08))
                             .overlay(Text("+ 排一段").font(.system(size: 11, weight: .semibold)).foregroundColor(Palette.coralText).lineLimit(1))
                             .frame(width: max(0, x(ghost.upperBound, w) - x(ghost.lowerBound, w) - 2), height: trackHeight - 10)
                             .offset(x: x(ghost.lowerBound, w) + 1, y: 5)
+                            .allowsHitTesting(false)
+                    }
+                    if let drag, drag.mode == .create {
+                        RoundedRectangle(cornerRadius: 8).fill(Palette.coral(0.14))
+                            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Palette.coral, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])))
+                            .frame(width: max(4, x(drag.end, w) - x(drag.start, w) - 2), height: trackHeight - 10)
+                            .offset(x: x(drag.start, w) + 1, y: 5)
                             .allowsHitTesting(false)
                     }
                     ForEach(layered) { item in
@@ -932,14 +1166,31 @@ private struct DayRibbon: View {
                                     }
                                 }
                             }
+                            .shadow(color: drag?.id == item.id ? Palette.ink(0.25) : .clear, radius: 6, y: 3)
                             .frame(width: box.width, height: box.height)
                             .contentShape(RoundedRectangle(cornerRadius: 8))
-                            .onTapGesture { hovered = item.id; ghost = nil; onSelect(item.id) }
+                            .gesture(segmentDrag(item, width: w))
+                            .contextMenu { segmentMenu(item) }
                             .offset(x: box.minX, y: box.minY)
                             .accessibilityElement()
                             .accessibilityLabel(timeLine(item) + "，" + item.title)
                             .accessibilityAddTraits(.isButton)
                             .accessibilityAction { hovered = item.id; ghost = nil; onSelect(item.id) }
+                    }
+                    ForEach(focus) { item in
+                        let box = rect(item, width: w)
+                        RoundedRectangle(cornerRadius: 6).fill(fill(item))
+                            .overlay(FocusHatch().stroke(.white.opacity(0.42), lineWidth: 1.5).clipShape(RoundedRectangle(cornerRadius: 6)))
+                            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.white.opacity(0.95), lineWidth: 1.5))
+                            .overlay {
+                                if !item.completed && box.width >= 12 { Circle().fill(.white).frame(width: 4, height: 4) }
+                            }
+                            .frame(width: box.width, height: box.height)
+                            .contentShape(RoundedRectangle(cornerRadius: 6))
+                            .onTapGesture { hovered = item.id; ghost = nil }
+                            .offset(x: box.minX, y: box.minY)
+                            .accessibilityElement()
+                            .accessibilityLabel(timeLine(item) + "，" + item.title)
                     }
                     if let item = items.first(where: { $0.id == selectedID }) {
                         let box = rect(item, width: w)
@@ -953,26 +1204,34 @@ private struct DayRibbon: View {
                         Circle().fill(Palette.coral).frame(width: 8, height: 8).offset(x: x(now, w) - 4, y: -6).allowsHitTesting(false)
                     }
                 }
+                .coordinateSpace(name: "ribbon")
                 // A tooltip must not change the track's layout or move its hover
                 // targets out from under the pointer when it appears.
                 .frame(width: w, height: trackHeight, alignment: .topLeading)
                 .contentShape(Rectangle())
                 .background(RibbonPointerArea { point in
+                    guard drag == nil else { return }
                     if let point {
                         // One tracking region resolves overlaps in the same order
                         // as drawing, rather than competing enter/exit callbacks.
-                        let hit = layered.reversed().first { item in
-                            rect(item, width: w).contains(point)
-                        }
-                        hovered = hit?.id
-                        ghost = hit == nil ? slot(at: point.x, width: w) : nil
+                        let found = hit(point, width: w)
+                        hovered = found?.id
+                        ghost = found == nil ? slot(at: point.x, width: w) : nil
+                        if let found, canRetime(found) {
+                            (edge(point, of: found, width: w) == .move ? NSCursor.openHand : NSCursor.resizeLeftRight).set()
+                        } else { NSCursor.arrow.set() }
                     } else {
-                        hovered = nil; ghost = nil
+                        hovered = nil; ghost = nil; NSCursor.arrow.set()
                     }
                 })
                 .overlay(alignment: .bottomLeading) {
-                    if let id = hovered, let item = items.first(where: { $0.id == id }) {
-                        tooltip(item, width: w)
+                    if let drag {
+                        bubble(ClockText.minute(drag.start) + "–" + ClockText.minute(drag.end), ClockText.duration(drag.end - drag.start),
+                               center: (x(drag.start, w) + x(drag.end, w)) / 2, width: w, tipWidth: 180)
+                            .offset(y: -trackHeight - 8)
+                    } else if let id = hovered, let item = (focus + items).first(where: { $0.id == id }) {
+                        bubble(timeLine(item), item.title.isEmpty ? "未命名的一段" : item.title,
+                               center: (x(item.start, w) + x(item.finish, w)) / 2, width: w, tipWidth: min(360, w))
                             .offset(y: -trackHeight - 8)
                     }
                 }
@@ -1004,6 +1263,55 @@ private struct DayRibbon: View {
         .onChange(of: items.map(\.id)) { _, _ in hovered = nil; ghost = nil }
     }
 
+    private func segmentDrag(_ item: AgendaItem, width w: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .named("ribbon"))
+            .onChanged { value in
+                if drag?.id != item.id {
+                    drag = RibbonDrag(id: item.id, mode: edge(value.startLocation, of: item, width: w),
+                                      originStart: item.start, originEnd: item.finish, start: item.start, end: item.finish)
+                }
+                guard var current = drag else { return }
+                if abs(value.translation.width) >= 3 { current.moved = true }
+                guard current.moved, canRetime(item) else { drag = current; return }
+                let delta = minutes(value.translation.width, w)
+                switch current.mode {
+                case .move:
+                    let length = current.originEnd - current.originStart
+                    let start = min(max(0, current.originStart + delta), 1440 - length)
+                    current.start = start; current.end = start + length
+                case .leading: current.start = min(max(0, current.originStart + delta), current.originEnd - 10)
+                case .trailing: current.end = max(min(1440, current.originEnd + delta), current.originStart + 10)
+                case .create: break
+                }
+                drag = current; hovered = nil; ghost = nil
+                NSCursor.closedHand.set()
+            }
+            .onEnded { _ in
+                guard let current = drag else { return }
+                drag = nil
+                if !current.moved { hovered = item.id; ghost = nil; onSelect(item.id) }
+                else if canRetime(item) && (current.start != current.originStart || current.end != current.originEnd) {
+                    onRetime(item, current.start, current.end)
+                }
+                NSCursor.arrow.set()
+            }
+    }
+
+    @ViewBuilder private func segmentMenu(_ item: AgendaItem) -> some View {
+        switch item.kind {
+        case .block:
+            Button("编辑") { onEdit(item) }
+            Button("删除时间块", role: .destructive) { onDelete(item) }
+        case .task:
+            Button("编辑") { onEdit(item) }
+            if item.task?.calendarSource == nil { Button("删除事项", role: .destructive) { onDelete(item) } }
+        case .project:
+            Button("调整这一天") { onEdit(item) }
+        case .focus:
+            EmptyView()
+        }
+    }
+
     private func legend(_ color: Color, _ title: String) -> some View {
         HStack(spacing: 6) {
             RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 14, height: 8)
@@ -1012,17 +1320,17 @@ private struct DayRibbon: View {
     }
 
     private func timeLine(_ item: AgendaItem) -> String {
-        let state = item.completed ? "已完成" : (item.isRest ? "休息" : (isLive(item) ? "进行中" : (isToday && item.finish <= now ? "已过" : "待做")))
+        let state: String
+        if item.kind == .focus { state = item.completed ? "已专注" : "专注中" }
+        else { state = item.completed ? "已完成" : (item.isRest ? "休息" : (isLive(item) ? "进行中" : (isToday && item.finish <= now ? "已过" : "待做"))) }
         return ClockText.minute(item.start) + "–" + ClockText.minute(item.finish) + " · " + ClockText.duration(item.finish - item.start) + " · " + state
     }
 
-    private func tooltip(_ item: AgendaItem, width w: CGFloat) -> some View {
-        let tipWidth = min(360, w)
-        let center = (x(item.start, w) + x(item.finish, w)) / 2
+    private func bubble(_ line: String, _ title: String, center: CGFloat, width w: CGFloat, tipWidth: CGFloat) -> some View {
         let left = min(max(0, center - tipWidth / 2), max(0, w - tipWidth))
         return VStack(alignment: .leading, spacing: 2) {
-            Text(timeLine(item)).font(.system(size: 11)).monospacedDigit().foregroundColor(.white.opacity(0.66))
-            Text(item.title.isEmpty ? "未命名的一段" : item.title).font(.system(size: 13, weight: .semibold)).foregroundColor(.white)
+            Text(line).font(.system(size: 11)).monospacedDigit().foregroundColor(.white.opacity(0.66))
+            Text(title).font(.system(size: 13, weight: .semibold)).foregroundColor(.white)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 12).padding(.top, 7).padding(.bottom, 8)
@@ -1037,13 +1345,28 @@ private struct DayRibbon: View {
     /// The free stretch under the pointer, snapped to 15 minutes, up to an hour.
     private func slot(at px: CGFloat, width w: CGFloat) -> Range<Int>? {
         guard w > 0 else { return nil }
+        let taken = items + focus
         let minute = startHour * 60 + Int(Double(px / w) * span)
-        if items.contains(where: { $0.start <= minute && minute < $0.finish }) { return nil }
-        let previous = items.map { $0.finish }.filter { $0 <= minute }.max() ?? startHour * 60
-        let next = items.map { $0.start }.filter { $0 > minute }.min() ?? endHour * 60
+        if taken.contains(where: { $0.start <= minute && minute < $0.finish }) { return nil }
+        let previous = taken.map { $0.finish }.filter { $0 <= minute }.max() ?? startHour * 60
+        let next = taken.map { $0.start }.filter { $0 > minute }.min() ?? endHour * 60
         let start = max((minute / 15) * 15, previous)
         let end = min(start + 60, next, 1440)
         return end - start >= 15 ? start..<end : nil
+    }
+}
+
+/// Diagonal lines that mark real focus time, whatever its colour.
+private struct FocusHatch: Shape {
+    var gap: CGFloat = 6
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        var x = rect.minX - rect.height
+        while x < rect.maxX {
+            path.move(to: CGPoint(x: x, y: rect.maxY)); path.addLine(to: CGPoint(x: x + rect.height, y: rect.minY))
+            x += gap
+        }
+        return path
     }
 }
 
@@ -1176,6 +1499,15 @@ struct HorizonView: View {
                 Button(task.resolvedKind == .event ? "安排准备" : "安排时间") { editor = BlockEditorItem(task: task, day: Day.today) }.font(.system(size: 10))
             }
             Button { store.toggle(task.id) } label: { Image(systemName: task.completed ? "checkmark.circle.fill" : "circle").foregroundColor(task.completed ? Palette.green : Palette.secondary) }.buttonStyle(.plain).help("划掉或恢复原事项")
+            Menu {
+                Button("编辑 / 改期") { onEdit(task) }
+                if task.calendarSource == nil {
+                    Divider()
+                    Button("删除", role: .destructive) { store.deleteTask(task.id) }
+                }
+            } label: {
+                Image(systemName: "ellipsis").font(.system(size: 12)).foregroundColor(Palette.secondary).frame(width: 18, height: 22)
+            }.menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 20).help("编辑或删除")
         }.padding(15).frame(minHeight: 76).background(Palette.card.opacity(priority ? 0.7 : 1), in: RoundedRectangle(cornerRadius: 10))
     }
 }

@@ -113,7 +113,6 @@ struct ContentView: View {
     @ViewState private var calendarMonth = Day.date(Day.today)!
     @ViewState private var selectedDay: String? = nil
     @ViewState private var search = ""
-    @ViewState private var deleted: Todo? = nil
     @ViewState private var undoDismiss: DispatchWorkItem? = nil
     @ViewState private var toastDismiss: DispatchWorkItem? = nil
 
@@ -153,6 +152,8 @@ struct ContentView: View {
                     ProjectsView(store: store)
                 } else if scope == .today {
                     DailyPlannerView(store: store, day: selectedDay ?? Day.today, onDay: { selectedDay = $0; calendarMonth = Day.date($0)! }, onEdit: { editor = EditorItem(task: $0, day: $0.day) }, onAddTask: { editor = EditorItem(day: selectedDay ?? Day.today) }, onOpenHorizon: { scope = .horizon; selectedDay = nil })
+                } else if scope == .plan {
+                    CalendarPlanView(store: store, month: $calendarMonth, selectedDay: $selectedDay, onAdd: { editor = EditorItem(day: $0) }, onEdit: { editor = EditorItem(task: $0, day: $0.day) }, onDelete: remove)
                 } else if scope == .horizon && selectedDay == nil {
                     HorizonView(store: store, onEdit: { editor = EditorItem(task: $0, day: $0.day) }, onAdd: { editor = EditorItem(day: Day.today) })
                 } else {
@@ -221,7 +222,7 @@ struct ContentView: View {
         }
         .sheet(item: $editor) { item in
             TaskEditor(store: store, item: item) { saved in
-                if !visibleDays.contains(saved.day) {
+                if scope == .plan || !visibleDays.contains(saved.day) {
                     selectedDay = saved.day
                     calendarMonth = Day.date(saved.day) ?? calendarMonth
                 }
@@ -233,15 +234,15 @@ struct ContentView: View {
             Button("知道了", role: .cancel) { store.errorMessage = nil }
         } message: { Text(store.errorMessage ?? "") }
         .overlay(alignment: .bottom) {
-            if let deleted {
+            if let undo = store.undo {
                 HStack(spacing: 15) {
-                    Text("已移除「\(deleted.title)」").lineLimit(1)
+                    Text(undo.message).lineLimit(1)
                     Button("撤销") {
-                        store.restore(deleted)
-                        self.deleted = nil
                         undoDismiss?.cancel()
+                        store.undo = nil
+                        undo.restore()
                     }.fontWeight(.semibold).foregroundColor(Palette.selection)
-                    Button { self.deleted = nil } label: { Image(systemName: "xmark") }
+                    Button { store.undo = nil } label: { Image(systemName: "xmark") }
                         .foregroundColor(.white.opacity(0.6)).help("关闭提示")
                 }
                 .buttonStyle(.plain).font(.system(size: 12))
@@ -254,6 +255,13 @@ struct ContentView: View {
                     .background(Palette.card, in: Capsule()).shadow(color: .black.opacity(0.08), radius: 8)
                     .padding(.bottom, 24)
             }
+        }
+        .onChange(of: store.undo?.id) { _, value in
+            undoDismiss?.cancel()
+            guard let value else { return }
+            let job = DispatchWorkItem { if store.undo?.id == value { store.undo = nil } }
+            undoDismiss = job
+            DispatchQueue.main.asyncAfter(deadline: .now() + 12, execute: job)
         }
         .onChange(of: store.toast) { _, value in
             toastDismiss?.cancel()
@@ -341,9 +349,10 @@ struct ContentView: View {
             }
         }()
         return SidebarNavRow(icon: item.icon, title: item.rawValue, badge: badge?.text, alert: badge?.alert ?? false,
-                             selected: scope == item && selectedDay == nil) {
+                             selected: scope == item && (selectedDay == nil || item == .plan)) {
             scope = item; selectedDay = nil; search = ""
-            if item == .today { calendarMonth = Day.date(Day.today)! }
+            if item == .today || item == .plan { calendarMonth = Day.date(Day.today)! }
+            if item == .plan { selectedDay = Day.today }
         }
     }
 
@@ -374,7 +383,7 @@ struct ContentView: View {
                             VStack(spacing: 2) {
                                 Text("\(Day.calendar.component(.day, from: date))")
                                     .font(.system(size: 10, weight: today ? .semibold : .regular))
-                                Circle().fill(store.tasks(on: key).isEmpty ? .clear : (today ? .white : Palette.coral))
+                                Circle().fill((store.tasks(on: key).isEmpty && store.blocks(on: key).isEmpty && !store.projects.contains { !$0.completed && $0.plan(on: key).minutes > 0 }) ? .clear : (today ? .white : Palette.coral))
                                     .frame(width: 3, height: 3)
                             }
                             .frame(maxWidth: .infinity).frame(height: 26)
@@ -492,13 +501,7 @@ struct ContentView: View {
         calendarMonth = Day.date(anchor)!
     }
     private func remove(_ task: Todo) {
-        store.remove(task.id)
-        guard !store.tasks.contains(where: { $0.id == task.id }) else { return }
-        deleted = task
-        undoDismiss?.cancel()
-        let job = DispatchWorkItem { deleted = nil }
-        undoDismiss = job
-        DispatchQueue.main.asyncAfter(deadline: .now() + 12, execute: job)
+        store.deleteTask(task.id)
     }
 }
 

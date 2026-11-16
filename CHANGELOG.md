@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.0 — 2026-11-16
+
+- Draw every focus round on the day ribbon at its recorded active times, as a hatched span in the project's colour, whichever screen started it; a running round grows live.
+- Count real focus in the u-cup alongside planned slots, and show planned and extra focus time separately.
+- Drag ribbon segments to resize or move them, drag across empty time to create a block, and right-click a segment to edit or delete it.
+- Add delete with a 12-second undo for tasks, time blocks, milestones and long-term projects; deleting a project keeps its focus history unlinked rather than erasing it.
+- Give projects an optional tone from six coral/purple-ink shades, and show flexible daily targets with time done and time left in today's list.
+- Fold two or more overdue milestones into one expandable row so upcoming ones stay visible; add a "skip this day" action to project day plans.
+- Add the month overview to “这几天”, switching between a month grid and a four-day focus.
+- Hide heavy scroll bars in editor sheets. 289 isolated checks pass.
+
 ## 0.5.0 — 2026-11-02
 
 - Refresh the speaking-u wordmark, app icon and purple-ink/coral interface, with frosted cards and grouped navigation.

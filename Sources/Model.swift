@@ -152,6 +152,12 @@ enum StoreError: LocalizedError {
 }
 
 @MainActor
+struct UndoAction: Identifiable {
+    let id = UUID()
+    let message: String
+    let restore: () -> Void
+}
+
 final class TodoStore: ObservableObject {
     @Published private(set) var tasks: [Todo] = []
     @Published private(set) var categories: [PlanCategory] = PlanCategory.defaults
@@ -159,6 +165,8 @@ final class TodoStore: ObservableObject {
     @Published private(set) var projects: [LifeProject] = []
     @Published var errorMessage: String? = nil
     @Published var toast: String? = nil
+    /// The last deletion, offered for undo in the main window.
+    @Published var undo: UndoAction? = nil
     private(set) var canSave = true
     let fileURL: URL
 
@@ -297,6 +305,76 @@ final class TodoStore: ObservableObject {
     }
     func toggleBlock(_ id: UUID) { guard var block = timeBlocks.first(where: { $0.id == id }) else { return }; block.completed.toggle(); _ = upsertBlock(block) }
     func removeBlock(_ id: UUID) { _ = commit(tasks, blocks: timeBlocks.filter { $0.id != id }) }
+
+    // MARK: Deletion with undo
+
+    /// Deletes a task. Time blocks that pointed at it stay on the timeline but
+    /// no longer link to it; undo restores both.
+    @discardableResult func deleteTask(_ id: UUID) -> Bool {
+        guard let task = tasks.first(where: { $0.id == id }), task.calendarSource == nil else { return false }
+        let linked = Set(timeBlocks.filter { $0.taskID == id }.map(\.id))
+        let blocks = timeBlocks.map { block -> TimeBlock in
+            var value = block; if value.taskID == id { value.taskID = nil }; return value
+        }
+        guard commit(tasks.filter { $0.id != id }, blocks: blocks) else { return false }
+        undo = UndoAction(message: "已删除「\(task.title)」") { [weak self] in
+            guard let self else { return }
+            var next = self.tasks
+            if !next.contains(where: { $0.id == task.id }) { next.append(task) }
+            let relinked = self.timeBlocks.map { block -> TimeBlock in
+                var value = block; if linked.contains(value.id) && value.taskID == nil { value.taskID = task.id }; return value
+            }
+            _ = self.commit(next, blocks: relinked)
+        }
+        return true
+    }
+
+    @discardableResult func deleteBlock(_ id: UUID) -> Bool {
+        guard let block = timeBlocks.first(where: { $0.id == id }) else { return false }
+        guard commit(tasks, blocks: timeBlocks.filter { $0.id != id }) else { return false }
+        undo = UndoAction(message: "已删除「\(block.title.isEmpty ? "未命名的一段" : block.title)」") { [weak self] in
+            _ = self?.upsertBlock(block)
+        }
+        return true
+    }
+
+    /// Deletes a long-term project. Focus history is kept but no longer counts
+    /// toward the project; its own upcoming plan slots are removed, while
+    /// finished or hand-made blocks stay on the timeline without the link.
+    @MainActor @discardableResult func deleteProject(_ id: UUID, focus clock: FocusClock? = nil) -> Bool {
+        let focus = clock ?? FocusClock.shared
+        guard let project = projects.first(where: { $0.id == id }) else { return false }
+        let linkedTasks = Set(tasks.filter { $0.projectID == id }.map(\.id))
+        let generated = timeBlocks.filter { $0.projectID == id && $0.projectPlanDay != nil && !$0.completed }
+        let generatedIDs = Set(generated.map(\.id))
+        let unlinked = timeBlocks.filter { $0.projectID == id && !generatedIDs.contains($0.id) }.map { ($0.id, $0.projectPlanDay) }
+        let nextTasks = tasks.map { task -> Todo in
+            var value = task; if value.projectID == id { value.projectID = nil }; return value
+        }
+        let nextBlocks = timeBlocks.filter { !generatedIDs.contains($0.id) }.map { block -> TimeBlock in
+            var value = block
+            if value.projectID == id { value.projectID = nil; value.projectPlanDay = nil }
+            return value
+        }
+        guard commit(nextTasks, blocks: nextBlocks, projects: projects.filter { $0.id != id }) else { return false }
+        let logs = focus.unlinkProject(id)
+        undo = UndoAction(message: "已删除项目「\(project.title)」") { [weak self, weak focus] in
+            guard let self else { return }
+            let restoredTasks = self.tasks.map { task -> Todo in
+                var value = task; if linkedTasks.contains(value.id) && value.projectID == nil { value.projectID = id }; return value
+            }
+            var restoredBlocks = self.timeBlocks.map { block -> TimeBlock in
+                var value = block
+                if let old = unlinked.first(where: { $0.0 == value.id }), value.projectID == nil { value.projectID = id; value.projectPlanDay = old.1 }
+                return value
+            }
+            for block in generated where !restoredBlocks.contains(where: { $0.id == block.id }) { restoredBlocks.append(block) }
+            var restoredProjects = self.projects
+            if !restoredProjects.contains(where: { $0.id == id }) { restoredProjects.append(project) }
+            if self.commit(restoredTasks, blocks: restoredBlocks, projects: restoredProjects) { focus?.relinkProject(id, logs: logs) }
+        }
+        return true
+    }
 
     func duplicate(of task: Todo) -> Todo? {
         let normalized = task.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()

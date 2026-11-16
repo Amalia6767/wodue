@@ -24,6 +24,8 @@ struct LifeProject: Identifiable, Codable, Equatable {
     var reminderLeadDays: Int? = nil
     var completed = false
     var createdAt = Date()
+    /// One of `ProjectTone.all`; nil keeps the default timeline colours.
+    var colorID: String? = nil
 
     var valid: Bool {
         guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, title.count <= 200,
@@ -35,7 +37,8 @@ struct LifeProject: Identifiable, Codable, Equatable {
               outcomeTarget.map({ (1...1_000_000_000).contains($0) }) ?? true,
               (0...1_000_000_000).contains(outcomeProgress), !outcomeUnit.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               outcomeUnit.count <= 12, (0..<1440).contains(reminderMinute),
-              reminderLeadDays.map({ (0...1095).contains($0) }) ?? true else { return false }
+              reminderLeadDays.map({ (0...1095).contains($0) }) ?? true,
+              colorID.map({ id in ProjectTone.all.contains { $0.id == id } }) ?? true else { return false }
         return true
     }
     func plan(on day: String) -> ProjectDayPlan {
@@ -106,4 +109,20 @@ enum ProjectEngine {
             return BusyInterval(start: start, end: start + plan.minutes, title: project.title)
         }
     }
+}
+
+/// Project colours stay inside the brand's two families: coral and purple ink.
+struct ProjectTone: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let hex: UInt32
+    static let all: [ProjectTone] = [
+        ProjectTone(id: "coral", name: "珊瑚", hex: 0xCA5140),
+        ProjectTone(id: "ember", name: "深珊瑚", hex: 0x9E3B2C),
+        ProjectTone(id: "rose", name: "玫瑰", hex: 0xD98A7E),
+        ProjectTone(id: "ink", name: "紫墨", hex: 0x332D3D),
+        ProjectTone(id: "plum", name: "灰紫", hex: 0x6E5C80),
+        ProjectTone(id: "mist", name: "雾紫", hex: 0xA898B8)
+    ]
+    static func of(_ id: String?) -> ProjectTone? { all.first { $0.id == id } }
 }

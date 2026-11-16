@@ -423,6 +423,29 @@ struct ModelTests {
         check(keptReminderData == originalReminderData && !brokenReminder.message.isEmpty, "Unreadable reminder records are preserved and reported rather than overwritten")
         try EventTests.run(root: root)
         try CalendarEditTests.run(root: root)
+        let november = MonthPlanning.days(in: "2026-11-30")
+        check(november.count == 42 && november.first == "2026-10-26" && november.last == "2026-12-06", "Month grid includes every date with Monday-aligned boundary days")
+        check(MonthPlanning.days(in: "2021-02-01").count == 28, "A four-week February does not grow a spurious extra row")
+        check(MonthPlanning.days(in: "2028-02-10").contains("2028-02-29"), "Month grid includes leap day")
+        check(MonthPlanning.shiftMonth("2026-12-31", by: 1) == "2027-01-01" && MonthPlanning.shiftMonth("2027-03-31", by: -1) == "2027-02-01", "Month navigation crosses years and short months without skipping")
+        var trip = Todo(title: "示例旅行", day: "2026-11-09"); trip.endDay = "2026-11-12"
+        let calendarBlock = TimeBlock(title: "示例写作", day: "2026-11-10", startMinute: 600, endMinute: 660)
+        var calendarProject = LifeProject(title: "示例项目", startDay: "2026-11-10", dueDay: "2026-11-12")
+        let calendarEntries = MonthPlanning.entries(on: "2026-11-10", tasks: [trip], blocks: [calendarBlock], projects: [calendarProject])
+        check(calendarEntries.count == 3 && Set(calendarEntries.map(\.kind)).count == 3, "Month previews include multi-day activities, time blocks and daily project plans")
+        check(MonthPlanning.entries(on: "2026-11-13", tasks: [trip], blocks: [calendarBlock], projects: [calendarProject]).isEmpty, "Dates with no saved or project plans remain empty")
+        check(MonthPlanning.entries(on: "2026-11-10", tasks: [trip], blocks: [calendarBlock], projects: [calendarProject], query: " 写作 ").count == 1, "Calendar search covers time blocks and trims whitespace")
+        check(calendarEntries.last?.kind == .project, "A flexible recurring project never hides concrete daily events and blocks at the front of a compact preview")
+        var managedBlock = calendarBlock; managedBlock.projectID = calendarProject.id; managedBlock.projectPlanDay = managedBlock.day
+        check(MonthPlanning.entries(on: managedBlock.day, tasks: [], blocks: [managedBlock], projects: [calendarProject]).count == 1, "A project scheduled as a managed block appears once in the month preview")
+        calendarProject.overrides["2026-11-10"] = ProjectDayPlan(minutes: 0)
+        check(MonthPlanning.entries(on: "2026-11-10", tasks: [], blocks: [], projects: [calendarProject]).isEmpty, "Project rest-day exceptions do not appear as scheduled work")
+        var doneCalendar = Todo(title: "已完成", day: "2026-11-10", startMinute: 480); doneCalendar.completed = true
+        let openCalendar = Todo(title: "未完成", day: "2026-11-10", startMinute: 900)
+        check(MonthPlanning.entries(on: openCalendar.day, tasks: [doneCalendar, openCalendar], blocks: [], projects: []).last?.sourceID == doneCalendar.id, "Calendar previews keep completed entries visible after unfinished entries")
+        check(MonthPlanning.entries(on: trip.lastDay, tasks: [trip], blocks: [], projects: []).first?.title == trip.title, "Multi-day activities remain visible on their final day")
+        var dateDeadline = Todo(title: "示例截止", day: "2026-11-10"); dateDeadline.kind = .deadline
+        check(MonthPlanning.entries(on: dateDeadline.day, tasks: [dateDeadline], blocks: [], projects: []).first?.time == "当天截止", "Calendar previews do not invent a time for date-only deadlines")
         try ProjectTests.run(root: root)
         print("All model, planning, focus, deadline, meeting, Canvas and synchronization checks passed.")
     }

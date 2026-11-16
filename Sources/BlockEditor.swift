@@ -79,6 +79,12 @@ struct BlockEditor: View {
                     TextField("例如：课程项目原型制作", text: $title, axis: .vertical)
                         .textFieldStyle(.roundedBorder).lineLimit(2...4).font(.system(size: 14))
                         .accessibilityLabel("时间块名称")
+                    if !store.projects.isEmpty {
+                        Picker("关联长期项目", selection: $projectID) {
+                            Text("不关联项目").tag(Optional<UUID>.none)
+                            ForEach(store.projects.filter { !$0.completed || $0.id == projectID }) { Text($0.title).tag(Optional($0.id)) }
+                        }.help("关联后，这段的专注时间会计入项目，并在动线上用项目颜色显示")
+                    }
                     HStack {
                         Picker("分类", selection: $categoryID) {
                             Text("未分类").tag(""); ForEach(store.categories) { Text($0.name).tag($0.id) }
@@ -86,12 +92,6 @@ struct BlockEditor: View {
                         Button("管理分类…") { categories = true }.font(.system(size: 10))
                     }
                     Toggle("这是一段休息 / 放松时间", isOn: $rest).toggleStyle(.checkbox)
-                    if !store.projects.isEmpty {
-                        Picker("所属项目", selection: $projectID) {
-                            Text("独立时段").tag(Optional<UUID>.none)
-                            ForEach(store.projects) { Text($0.title).tag(Optional($0.id)) }
-                        }
-                    }
                     DatePicker("安排日期", selection: $date, displayedComponents: .date).datePickerStyle(.field)
                     HStack(spacing: 17) {
                         DatePicker("开始", selection: $start, displayedComponents: .hourAndMinute).datePickerStyle(.field)
@@ -131,9 +131,15 @@ struct BlockEditor: View {
                     if !slotMessage.isEmpty { Text(slotMessage).foregroundColor(Palette.accent) }
                     TextField("这段时间想完成到什么程度？（可选）", text: $notes, axis: .vertical).lineLimit(2...4).textFieldStyle(.roundedBorder)
                 }.font(.system(size: 11)).padding(.trailing, 5).environment(\.locale, Locale(identifier: "zh_CN"))
-            }
+            }.quietScroll()
             HStack {
-                Text("专注计时会在时间块结束时收尾。").font(.system(size: 10)).foregroundColor(Palette.secondary)
+                if let existing = item.block, store.timeBlocks.contains(where: { $0.id == existing.id }) {
+                    Button("删除时间块", role: .destructive) {
+                        if store.deleteBlock(existing.id) { dismiss() }
+                    }.foregroundColor(Palette.error).help("删除后 12 秒内可以在主窗口撤销")
+                } else {
+                    Text("专注计时会在时间块结束时收尾。").font(.system(size: 10)).foregroundColor(Palette.secondary)
+                }
                 Spacer()
                 Button("取消") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button(conflicts.isEmpty ? "保存时间块" : "保存（有重叠）") {
